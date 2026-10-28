@@ -101,6 +101,7 @@ Find the pdf file "Lifelink Results.pdf" for the ScreenShots Of Demo.
 ## Author
 
 **Rashmi K S Poojary**
+
 Aspiring Software Developer | Python | Flask | MySQL | Web Development
 
 *Developed as an academic project.*
