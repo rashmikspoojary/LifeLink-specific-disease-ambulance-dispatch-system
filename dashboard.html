@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeLink Driver Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    <style>
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 34%),
+                linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+            color: #12243a;
+        }
+
+        .topbar {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+        }
+
+        .hero-card,
+        .panel-card {
+            border: 0;
+            border-radius: 20px;
+            box-shadow: 0 16px 38px rgba(15, 23, 42, 0.09);
+        }
+
+        .hero-card {
+            background: linear-gradient(135deg, #1d4ed8 0%, #0284c7 100%);
+            color: #fff;
+        }
+
+        .notification-bell {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 46px;
+            height: 46px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            text-decoration: none;
+            font-size: 1.3rem;
+        }
+
+        .notification-count {
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            min-width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            background: #dc2626;
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 6px;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .status-pending {
+            background: #fff7ed;
+            color: #c2410c;
+        }
+
+        .status-accepted {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .status-on-the-way {
+            background: #ede9fe;
+            color: #6d28d9;
+        }
+
+        .status-reached {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .status-completed {
+            background: #ecfccb;
+            color: #3f6212;
+        }
+
+        .meta-label {
+            color: #64748b;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 4px;
+        }
+
+        .meta-value {
+            color: #0f172a;
+            font-weight: 700;
+        }
+
+        .notification-item {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px 0;
+        }
+
+        .notification-item:last-child {
+            border-bottom: 0;
+            padding-bottom: 0;
+        }
+    </style>
+</head>
+
+<body data-active-booking="{{ 'true' if active_booking else 'false' }}">
+    <nav class="navbar topbar sticky-top">
+        <div class="container py-2">
+            <div>
+                <div class="d-flex align-items-center gap-3">
+                    <img src="{{ url_for('static', filename='LifeLink Logo.png') }}" alt="LifeLink Logo"
+                        style="height: 50px; width: auto; mix-blend-mode: multiply;">
+                    <div class="fw-bold fs-4 text-primary d-none d-md-block">Driver Dashboard</div>
+                </div>
+                <div class="text-secondary">Welcome, {{ session.get("name", "Driver") }}</div>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <a href="/notifications" class="notification-bell" aria-label="Notifications">
+                    <span>&#128276;</span>
+                    <span class="notification-count" id="notification-count" {% if not unread_notifications
+                        %}style="display:none;" {% endif %}>{{ unread_notifications }}</span>
+                </a>
+                <a href="/logout" class="btn btn-outline-danger">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        <section class="card hero-card mb-4">
+            <div class="card-body p-4">
+                <div class="row g-3 align-items-center">
+                    <div class="col-lg-8">
+                        <div class="small text-white-50 text-uppercase fw-semibold mb-2">Driver Control Center</div>
+                        <h1 class="h3 fw-bold mb-2">Assigned trip details, live notifications, and status controls in
+                            one place</h1>
+                        <p class="mb-0 text-white-50">Use this page to accept bookings, update live progress, and keep
+                            users plus admins informed in real time.</p>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="bg-white bg-opacity-10 rounded-4 p-3">
+                            <div class="small text-white-50">Unread Notifications</div>
+                            <div class="display-6 fw-bold" id="hero-notification-count">{{ unread_notifications }}</div>
+                            <div class="small text-white-50">Tap the bell icon to open full driver notifications.</div>
+                        </div>
+                        <div class="bg-white bg-opacity-10 rounded-4 p-3 mt-2 {% if not active_booking %}d-none{% endif %}"
+                            id="driver-location-card" style="border: 1px solid rgba(255,255,255,0.2);">
+                            <div class="small text-white-50 mb-1">📍 Live Tracking Control</div>
+                            <div class="small fw-semibold mb-2" id="driver-place-name" style="line-height:1.4;">
+                                {% if active_booking %}Ready to track...{% else %}No active trip{% endif %}
+                            </div>
+
+                            {% if active_booking and active_booking.pickup_latitude %}
+                            <a href="{{ url_for('driver_live_location_page', tracking_token=driver_tracking_token) }}"
+                                class="btn btn-sm btn-outline-light w-100 py-2 mb-2"
+                                style="font-size:0.75rem; font-weight:700;">📡 Open Live Share</a>
+
+                            <button id="sim-btn" class="btn btn-sm btn-light w-100 py-2 shadow-sm"
+                                onclick="toggleSimulation()"
+                                style="font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">🚀
+                                Start Simulation</button>
+                            <div id="sim-status"
+                                style="font-size:0.65rem; margin-top:6px; display:none; color:#bef264; font-weight:700; text-align:center; text-transform:uppercase;">
+                                ● Simulation Running</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <section class="card panel-card mb-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                            <div>
+                                <h2 class="h4 fw-bold mb-1">Current Assigned Booking</h2>
+                                <div class="text-secondary">Patient details, pickup point, disease type, emergency
+                                    level, and live status.</div>
+                            </div>
+                            {% if active_booking %}
+                            <span
+                                class="status-pill status-{{ active_booking.status|replace(' ', '-')|replace('_', '-') }}">{{
+                                booking_status_label(active_booking.status) }}</span>
+                            {% endif %}
+                        </div>
+
+                        {% if active_booking %}
+        <div id="booking-meta" hidden
+             data-booking-id="{{ active_booking.id }}"
+             data-booking-status="{{ active_booking.status }}"
+             data-assigned-at="{{ active_booking.assigned_at_iso if active_booking.assigned_at_iso else '' }}"
+             data-server-time="{{ active_booking.server_time_iso if active_booking.server_time_iso else '' }}"
+        ></div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="meta-label">Patient Name</div>
+                                <div class="meta-value">{{ active_booking.patient_name }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="meta-label">Phone Number</div>
+                                <div class="meta-value"><a href="tel:{{ active_booking.patient_phone }}"
+                                        class="text-decoration-none">{{ active_booking.patient_phone }}</a></div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="meta-label">Pickup Location</div>
+                                <div class="meta-value">{{ active_booking.pickup_location or "Not provided" }}</div>
+                                {% if active_booking.pickup_latitude and active_booking.pickup_longitude %}
+                                <div class="mt-2 d-flex flex-wrap gap-2">
+                                    <a href="https://www.google.com/maps/dir/?api=1&destination={{ active_booking.pickup_latitude }},{{ active_booking.pickup_longitude }}"
+                                        target="_blank" class="btn btn-sm btn-success">🗺️ Navigate (Google Maps)</a>
+                                    <a href="https://waze.com/ul?ll={{ active_booking.pickup_latitude }},{{ active_booking.pickup_longitude }}&navigate=yes"
+                                        target="_blank" class="btn btn-sm btn-outline-primary">🔵 Open in Waze</a>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <div class="meta-label">Hospital</div>
+                                <div class="meta-value">{{ active_booking.hospital_name or "Not assigned" }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="meta-label">Vehicle</div>
+                                <div class="meta-value">{{ active_booking.vehicle_number or "Awaiting ambulance" }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="meta-label">Disease Type</div>
+                                <div class="meta-value">{{ active_booking.disease_type or "General Emergency" }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="meta-label">Emergency Level</div>
+                                <div class="meta-value text-capitalize">{{ active_booking.emergency_level or "medium" }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="meta-label">Medical Notes</div>
+                                <div class="meta-value">{{ active_booking.medical_notes or "No additional notes" }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="meta-label">Estimated Arrival</div>
+                                <div class="meta-value">
+                                    {% if active_booking.estimated_arrival_minutes %}
+                                    {{ active_booking.estimated_arrival_minutes }} minutes
+                                    {% else %}
+                                    Waiting for live ETA
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if active_booking.pickup_latitude and active_booking.pickup_longitude %}
+                        <div class="mb-4">
+                            <div class="meta-label mb-2">📍 Patient Pickup on Map</div>
+                            <div id="driver-pickup-map" data-lat="{{ active_booking.pickup_latitude }}"
+                                data-lng="{{ active_booking.pickup_longitude }}"
+                                style="height:220px;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;">
+                            </div>
+                            <div id="driver-pickup-address" class="mt-2 p-2 rounded"
+                                style="background:#f8fbff;border:1px solid #e2e8f0;font-size:0.82rem;color:#475569;">
+                                Loading patient address…</div>
+                        </div>
+                        {% endif %}
+
+                        <div class="d-flex flex-wrap gap-2">
+                            {% if active_booking.status == "pending" %}
+                            <div class="alert alert-warning w-100 mb-3 d-flex justify-content-between align-items-center" id="timer-alert" style="border-width:2px; font-size:1.1rem;">
+                                <div>
+                                    <strong class="text-danger">🚨 URGENT:</strong> New emergency booking!
+                                    <div class="small text-dark mt-1">Accept within <strong id="countdown-text" class="text-danger fs-5">30</strong> seconds or it will be reassigned.</div>
+                                </div>
+                                <div id="countdown-circle" style="font-size: 2rem; font-weight: bold; color: #dc3545; padding: 10px;">
+                                    30s
+                                </div>
+                            </div>
+                            
+                            <form method="POST" action="/driver/update_status" class="m-0" id="accept-form">
+                                <input type="hidden" name="booking_id" value="{{ active_booking.id }}">
+                                <input type="hidden" name="action" value="accept">
+                                <button class="btn btn-success btn-lg fw-bold" type="submit" id="accept-btn">✅ Accept Booking</button>
+                            </form>
+                            <form method="POST" action="/driver/update_status" class="m-0" id="reject-form">
+                                <input type="hidden" name="booking_id" value="{{ active_booking.id }}">
+                                <input type="hidden" name="action" value="reject">
+                                <button class="btn btn-outline-danger btn-lg" type="submit" id="reject-btn">❌ Reject</button>
+                            </form>
+                            {% elif active_booking.status == "accepted" %}
+                            <form method="POST" action="/driver/update_status" class="m-0">
+                                <input type="hidden" name="booking_id" value="{{ active_booking.id }}">
+                                <input type="hidden" name="action" value="on-the-way">
+                                <button class="btn btn-primary" type="submit">Mark On The Way</button>
+                            </form>
+                            {% elif active_booking.status == "on-the-way" %}
+                            <form method="POST" action="/driver/update_status" class="m-0">
+                                <input type="hidden" name="booking_id" value="{{ active_booking.id }}">
+                                <input type="hidden" name="action" value="reached">
+                                <button class="btn btn-warning" type="submit">Mark Reached</button>
+                            </form>
+                            {% elif active_booking.status == "reached" %}
+                            <form method="POST" action="/driver/update_status" class="m-0">
+                                <input type="hidden" name="booking_id" value="{{ active_booking.id }}">
+                                <input type="hidden" name="action" value="completed">
+                                <button class="btn btn-dark" type="submit">Complete Trip</button>
+                            </form>
+                            {% endif %}
+                            <a class="btn btn-outline-primary" href="/driver/live/{{ driver_tracking_token }}">Open Live
+                                Share</a>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-light border mb-0">
+                            No active booking is assigned right now. New driver notifications will appear here when
+                            dispatch assigns a case.
+                        </div>
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="card panel-card">
+                    <div class="card-body p-4">
+                        <h2 class="h4 fw-bold mb-3">Recent Assigned Bookings</h2>
+                        <div class="table-responsive">
+                            <table class="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Patient</th>
+                                        <th>Disease</th>
+                                        <th>Emergency</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for booking in recent_bookings %}
+                                    <tr>
+                                        <td>#{{ booking.id }}</td>
+                                        <td>{{ booking.patient_name }}</td>
+                                        <td>{{ booking.disease_type or "General Emergency" }}</td>
+                                        <td class="text-capitalize">{{ booking.emergency_level or "medium" }}</td>
+                                        <td>{{ booking_status_label(booking.status) }}</td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-secondary">No booking history yet.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-4">
+                <section class="card panel-card">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="h4 fw-bold mb-0">Notifications</h2>
+                            <a class="btn btn-sm btn-outline-primary" href="/notifications">View All</a>
+                        </div>
+                        {% for note in notifications %}
+                        <div class="notification-item">
+                            <div class="fw-semibold">{{ note.message }}</div>
+                            <div class="small text-secondary mt-1">{{ note.created_at }}</div>
+                        </div>
+                        {% else %}
+                        <div class="text-secondary">No driver notifications yet.</div>
+                        {% endfor %}
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script>
+        // ── Mini map: show patient pickup location ──
+        const mapEl = document.getElementById('driver-pickup-map');
+        const pickupLat = mapEl ? parseFloat(mapEl.dataset.lat) : null;
+        const pickupLng = mapEl ? parseFloat(mapEl.dataset.lng) : null;
+
+        if (mapEl && pickupLat && pickupLng) {
+            const pickupMap = L.map('driver-pickup-map', { zoomControl: true, scrollWheelZoom: false })
+                .setView([pickupLat, pickupLng], 16);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '\u00a9 OpenStreetMap'
+            }).addTo(pickupMap);
+
+            const patientIcon = L.divIcon({
+                className: '',
+                html: '<div style="font-size:26px;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.4))">📍</div>',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
+
+            L.marker([pickupLat, pickupLng], { icon: patientIcon })
+                .addTo(pickupMap)
+                .bindPopup('👤 Patient Pickup Point')
+                .openPopup();
+
+            // Reverse geocode patient address
+            const addrEl = document.getElementById('driver-pickup-address');
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pickupLat}&lon=${pickupLng}`)
+                .then(r => r.json())
+                .then(d => { if (addrEl) addrEl.textContent = '📍 ' + (d.display_name || `${pickupLat}, ${pickupLng}`); })
+                .catch(() => { if (addrEl) addrEl.textContent = `📍 ${pickupLat}, ${pickupLng}`; });
+        }
+
+        // 🔔 Notifications
+        setInterval(function () {
+            fetch('/api/notifications/unread')
+                .then(function (response) {
+                    return response.ok ? response.json() : null;
+                })
+                .then(function (payload) {
+                    if (!payload || !payload.ok) return;
+
+                    const unread = Array.isArray(payload.data) ? payload.data.length : 0;
+
+                    const countEl = document.getElementById('notification-count');
+                    const heroCountEl = document.getElementById('hero-notification-count');
+
+                    if (heroCountEl) {
+                        heroCountEl.textContent = unread;
+                    }
+
+                    if (countEl) {
+                        countEl.textContent = unread;
+                        countEl.style.display = unread > 0 ? 'inline-flex' : 'none';
+                    }
+                })
+                .catch(function () { });
+        }, 10000);
+
+
+        // ── Simulation Logic ──
+        let simInterval = null;
+        let currentSimLat = null;
+        let currentSimLng = null;
+
+        function toggleSimulation() {
+            const btn = document.getElementById('sim-btn');
+            const status = document.getElementById('sim-status');
+
+            if (simInterval) {
+                clearInterval(simInterval);
+                simInterval = null;
+                btn.textContent = '🚀 Start Simulation';
+                btn.classList.replace('btn-danger', 'btn-light');
+                status.style.display = 'none';
+                return;
+            }
+
+            // Fallback start point if GPS hasn't fired yet
+            if (!currentSimLat) {
+                currentSimLat = 13.02153;
+                currentSimLng = 74.96866;
+            }
+
+            if (!pickupLat || !pickupLng) {
+                alert("Patient location not found. Cannot start simulation.");
+                return;
+            }
+
+            btn.textContent = '🛑 Stop Simulation';
+            btn.classList.replace('btn-light', 'btn-danger');
+            status.style.display = 'block';
+
+            simInterval = setInterval(() => {
+                // Move slightly towards pickup
+                const step = 0.0002;
+                if (Math.abs(currentSimLat - pickupLat) > step) {
+                    currentSimLat += (pickupLat > currentSimLat ? step : -step);
+                }
+                if (Math.abs(currentSimLng - pickupLng) > step) {
+                    currentSimLng += (pickupLng > currentSimLng ? step : -step);
+                }
+
+                // Send simulated position to backend
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentSimLat}&lon=${currentSimLng}`)
+                    .then(r => r.json())
+                    .then(d => {
+                        const txt = d.display_name || '';
+                        document.getElementById('driver-place-name').textContent = "[SIM] " + txt;
+
+                        fetch('/driver/update_location', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ lat: currentSimLat, lon: currentSimLng, location_text: txt })
+                        });
+                    });
+
+                // Check if reached
+                if (Math.abs(currentSimLat - pickupLat) < step && Math.abs(currentSimLng - pickupLng) < step) {
+                    toggleSimulation();
+                    alert("Simulation Complete: Reached Patient Location!");
+                }
+            }, 3000);
+        }
+
+        // 🚑 Driver tracking (SAFE) - reads from data-* attributes, no Jinja in JS
+        const hasActiveBooking = document.body.dataset.activeBooking === 'true';
+        let currentBookingId = null;
+        let activeBookingStatus = null;
+
+        const bookingMeta = document.getElementById('booking-meta');
+        if (bookingMeta) {
+            currentBookingId = parseInt(bookingMeta.dataset.bookingId, 10) || null;
+            activeBookingStatus = bookingMeta.dataset.bookingStatus || null;
+
+            // Timer Logic for Pending
+            if (activeBookingStatus === "pending") {
+                const assignedAtStr = bookingMeta.dataset.assignedAt || '';
+                const serverTimeStr = bookingMeta.dataset.serverTime || '';
+
+                if (assignedAtStr && serverTimeStr) {
+                    const assignedAt = new Date(assignedAtStr).getTime();
+                    const serverTime = new Date(serverTimeStr).getTime();
+                    const localOffset = new Date().getTime() - serverTime;
+
+                    const acceptBtn = document.getElementById("accept-btn");
+                    const rejectBtn = document.getElementById("reject-btn");
+                    const txt = document.getElementById("countdown-text");
+                    const circ = document.getElementById("countdown-circle");
+
+                    // AUDIO ALERT
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    let beepInterval = setInterval(() => {
+                        try {
+                            const osc = audioCtx.createOscillator();
+                            const gain = audioCtx.createGain();
+                            osc.connect(gain);
+                            gain.connect(audioCtx.destination);
+                            osc.type = "square";
+                            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                            osc.start();
+                            osc.stop(audioCtx.currentTime + 0.15);
+                        } catch(e) {}
+                    }, 1000);
+
+                    let rejectInProgress = false;
+
+                    const timerInterval = setInterval(() => {
+                        const now = new Date().getTime() - localOffset;
+                        let secondsLeft = 30 - Math.floor((now - assignedAt) / 1000);
+
+                        if (secondsLeft <= 0) {
+                            clearInterval(timerInterval);
+                            clearInterval(beepInterval);
+                            secondsLeft = 0;
+                            if (acceptBtn) acceptBtn.disabled = true;
+                            if (rejectBtn) rejectBtn.disabled = true;
+                            if (txt) txt.textContent = "0";
+                            if (circ) { circ.textContent = "0s"; circ.style.color = "gray"; }
+
+                            // Auto reject fallback - ONLY if not already rejecting
+                            if (!rejectInProgress) {
+                                rejectInProgress = true;
+                                console.log("Timer expired. Triggering auto-rejection...");
+                                fetch('/api/driver/reject_trip', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ booking_id: currentBookingId })
+                                })
+                                .then(response => {
+                                    // Even if 500, we reload once. 
+                                    // If we reload and it's still expired, the rejectInProgress will reset,
+                                    // but hopefully the server fix prevents the 500 loop.
+                                    window.location.reload();
+                                })
+                                .catch(err => {
+                                    console.error("Rejection failed:", err);
+                                    window.location.reload();
+                                });
+                            }
+                        } else {
+                            if (txt) txt.textContent = secondsLeft;
+                            if (circ) circ.textContent = secondsLeft + "s";
+                        }
+                    }, 500);
+                }
+            }
+        }
+
+        // Poll for active trips if we don't have a booking or if we have one and want to check if it's reassigned
+        setInterval(function () {
+            if (!simInterval) {
+                fetch('/api/driver/active_trip')
+                    .then(r => r.json())
+                    .then(payload => {
+                        if (payload.ok) {
+                            if (payload.data) {
+                                // If a NEW trip arrived, or our trip changed state from the server side
+                                if (payload.data.id !== currentBookingId || payload.data.status !== activeBookingStatus) {
+                                    window.location.reload(); 
+                                }
+                            } else {
+                                // No active trip from server. If we thought we had one, reload.
+                                if (hasActiveBooking) {
+                                    window.location.reload();
+                                }
+                            }
+                        }
+                    }).catch(e => console.log(e));
+            }
+        }, 3000);
+
+        if (hasActiveBooking) {
+
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(
+                    function (pos) {
+                        if (!simInterval) { // Only update real GPS if simulation is OFF
+                            const lat = pos.coords.latitude;
+                            const lon = pos.coords.longitude;
+                            currentSimLat = lat; // Seed simulation start point
+                            currentSimLng = lon;
+
+                            // Reverse geocode to get place name, then send everything to backend
+                            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                                .then(function (r) { return r.json(); })
+                                .then(function (d) {
+                                    const locationText = d.display_name || '';
+
+                                    // Send location + place name to backend
+                                    fetch('/driver/update_location', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ lat: lat, lon: lon, location_text: locationText })
+                                    });
+
+                                    // Show in driver dashboard card
+                                    const card = document.getElementById('driver-location-card');
+                                    const nameEl = document.getElementById('driver-place-name');
+                                    if (card && nameEl) {
+                                        card.style.display = 'block';
+                                        nameEl.textContent = locationText || (lat.toFixed(5) + ', ' + lon.toFixed(5));
+                                    }
+                                })
+                                .catch(function () {
+                                    // Send without text on geocoding failure
+                                    fetch('/driver/update_location', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ lat: lat, lon: lon, location_text: '' })
+                                    });
+                                });
+                        }
+                    },
+                    function (error) {
+                        console.log("Location error:", error);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 5000,
+                        timeout: 10000
+                    }
+                );
+            } else {
+                console.log("Geolocation not supported");
+            }
+        }
+
+    </script>
+</body>
+
+</html>

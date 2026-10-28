@@ -1,0 +1,290 @@
+{% extends "admin/admin_base.html" %}
+
+{% block content %}
+<style>
+  /* ── Fleet Map Controls ── */
+  #fleet-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid #d8e0ea;
+    background: #fff;
+  }
+  #fleet-topbar h2 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+  #fleet-topbar p  { margin: 0; font-size: 0.82rem; color: #64748b; }
+
+  #live-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46;
+    padding: 4px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+  }
+  .blink { animation: blink 1s linear infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  #tracking-map { height: 520px; }
+
+  /* ── Legend ── */
+  .map-legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    padding: 10px 18px; background: #f8faff;
+    border-bottom: 1px solid #e2e8f0; font-size: 0.8rem; color: #475569;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+
+  /* ── Table ── */
+  #tracking-table-body td { font-size: 0.83rem; vertical-align: middle; }
+  .status-pill {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; text-transform: capitalize;
+  }
+  .s-pending    { background:#fff3e0; color:#e65100; }
+  .s-accepted   { background:#e3f2fd; color:#1565c0; }
+  .s-on-the-way { background:#ede7f6; color:#4527a0; }
+  .s-reached    { background:#e8f5e9; color:#2e7d32; }
+  .s-completed  { background:#f1f8e9; color:#33691e; }
+
+  .nav-link-btn {
+    display: inline-block; font-size: 11px; padding: 3px 8px;
+    border-radius: 6px; text-decoration: none; background: #e8f5e9; color: #2e7d32;
+    border: 1px solid #a5d6a7; white-space: nowrap;
+  }
+</style>
+
+<div class="table-container" style="padding:0;overflow:hidden;">
+
+  <!-- TOP BAR -->
+  <div id="fleet-topbar">
+    <div>
+      <h2>🚑 Fleet Dispatch Map</h2>
+      <p>All active ambulances, patient pickup points, and real road routes — live.</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span id="live-badge"><span class="blink">●</span> Auto-refresh every 8s</span>
+      <button class="btn btn-primary btn-sm" type="button" onclick="loadLiveTracking()">⟳ Refresh Now</button>
+    </div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="map-legend">
+    <div class="legend-item">🚑 <span>Ambulance (live GPS)</span></div>
+    <div class="legend-item">📍 <span>Patient pickup point</span></div>
+    <div class="legend-item" style="gap:8px;"><span style="display:inline-block;width:28px;height:4px;background:#2563eb;border-radius:2px;"></span><span>Road route</span></div>
+    <div class="legend-item" style="gap:8px;"><span style="display:inline-block;width:28px;height:4px;background:#dc2626;border-radius:2px;"></span><span>Critical/High route</span></div>
+  </div>
+
+  <!-- MAP -->
+  <div id="tracking-map"></div>
+</div>
+
+<!-- DISPATCH TABLE -->
+<div class="table-container" style="margin-top:14px;">
+  <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+    <h2 style="margin:0;font-size:1rem;font-weight:700;">Active Dispatches</h2>
+    <span id="dispatch-count" style="font-size:0.82rem;color:#64748b;"></span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Patient</th>
+        <th>Pickup Location</th>
+        <th>Ambulance</th>
+        <th>Driver</th>
+        <th>Status</th>
+        <th>ETA</th>
+        <th>Navigate</th>
+      </tr>
+    </thead>
+    <tbody id="tracking-table-body">
+      <tr><td colspan="8" style="text-align:center;">Loading live tracking data…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+"use strict";
+
+/* ── Map init ── */
+const map = L.map("tracking-map").setView([13.0244, 74.9896], 11);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: "© <a href='https://openstreetmap.org'>OpenStreetMap</a>"
+}).addTo(map);
+
+let liveLayers = [];
+function clearLayers() {
+  liveLayers.forEach(l => map.removeLayer(l));
+  liveLayers = [];
+}
+function addLayer(l) { liveLayers.push(l); return l.addTo(map); }
+
+/* ── Icons ── */
+function ambIcon(label) {
+  return L.divIcon({
+    className: "",
+    html: `<div style="font-size:22px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35));animation:bounce-amb 2s ease-in-out infinite;">🚑</div>
+           <div style="font-size:10px;font-weight:700;color:#1e3a8a;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:1px 4px;margin-top:2px;text-align:center;white-space:nowrap;">${label}</div>`,
+    iconSize: [60, 44],
+    iconAnchor: [30, 22]
+  });
+}
+function pickupIcon() {
+  return L.divIcon({
+    className: "",
+    html: `<div style="font-size:22px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35));">📍</div>`,
+    iconSize: [24, 32],
+    iconAnchor: [12, 32]
+  });
+}
+
+/* ── Draw OSRM road route ── */
+async function drawRoute(from, to, isEmergency, label) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.routes || !data.routes.length) throw new Error("no route");
+
+    const coords = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+    const etaSec = data.routes[0].duration;
+    const etaMin = Math.ceil(etaSec / 60);
+    const distKm = (data.routes[0].distance / 1000).toFixed(1);
+
+    const line = addLayer(L.polyline(coords, {
+      color:     isEmergency ? "#dc2626" : "#2563eb",
+      weight:    isEmergency ? 6 : 4,
+      opacity:   0.88,
+      dashArray: isEmergency ? null : "12 7"
+    })).bindPopup(`🚑 <strong>${label}</strong><br>📏 ${distKm} km via road<br>⏱ ETA ~${etaMin} min`);
+
+    return { etaMin, distKm };
+  } catch {
+    /* straight-line fallback */
+    addLayer(L.polyline([[from.lat, from.lng], [to.lat, to.lng]], {
+      color: isEmergency ? "#dc2626" : "#2563eb", weight: 3, opacity: 0.7, dashArray: "8 6"
+    }));
+    return null;
+  }
+}
+
+/* ── Status pill helper ── */
+function pill(status) {
+  const cls = { pending: "s-pending", accepted: "s-accepted", "on-the-way": "s-on-the-way", reached: "s-reached", completed: "s-completed" };
+  return `<span class="status-pill ${cls[status] || ''}">${status}</span>`;
+}
+
+/* ── Main fetch & render ── */
+async function loadLiveTracking() {
+  const tableBody = document.getElementById("tracking-table-body");
+  const countEl   = document.getElementById("dispatch-count");
+  tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Loading…</td></tr>';
+  clearLayers();
+
+  try {
+    const res     = await fetch("/admin/api/live-tracking");
+    const payload = await res.json();
+
+    if (!res.ok || !payload.ok || !payload.data.length) {
+      tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94a3b8;">No active dispatches right now.</td></tr>';
+      if (countEl) countEl.textContent = "0 active";
+      return;
+    }
+
+    if (countEl) countEl.textContent = `${payload.data.length} active`;
+
+    const bounds = [];
+    const rows   = [];
+
+    /* Process each active booking in parallel for routing */
+    const routePromises = payload.data.map(async item => {
+      const isEmergency = ["high","critical"].includes((item.emergency_level || "").toLowerCase());
+
+      /* ── Ambulance marker ── */
+      if (item.ambulance_latitude != null && item.ambulance_longitude != null) {
+        const ambLat = parseFloat(item.ambulance_latitude);
+        const ambLng = parseFloat(item.ambulance_longitude);
+        addLayer(
+          L.marker([ambLat, ambLng], { icon: ambIcon(item.vehicle_number || "AMB"), zIndexOffset: 1000 })
+           .bindPopup(
+             `<strong>🚑 ${item.vehicle_number || "Ambulance"}</strong><br>` +
+             `Driver: ${item.driver_name}<br>` +
+             `Booking: #${item.booking_id}<br>` +
+             `Status: ${item.status}<br>` +
+             (item.driver_phone ? `📞 <a href="tel:${item.driver_phone}">${item.driver_phone}</a>` : "")
+           )
+        );
+        bounds.push([ambLat, ambLng]);
+      }
+
+      /* ── Pickup marker ── */
+      let etaMin = item.estimated_arrival_minutes || "—";
+      if (item.pickup_latitude != null && item.pickup_longitude != null) {
+        const pLat = parseFloat(item.pickup_latitude);
+        const pLng = parseFloat(item.pickup_longitude);
+        addLayer(
+          L.marker([pLat, pLng], { icon: pickupIcon() })
+           .bindPopup(`📍 <strong>Pickup: #${item.booking_id}</strong><br>${item.pickup_location}<br>Patient: ${item.user_name}`)
+        );
+        bounds.push([pLat, pLng]);
+
+        /* ── Draw OSRM road route if ambulance GPS is available ── */
+        if (item.ambulance_latitude != null && item.ambulance_longitude != null) {
+          const result = await drawRoute(
+            { lat: parseFloat(item.ambulance_latitude), lng: parseFloat(item.ambulance_longitude) },
+            { lat: pLat, lng: pLng },
+            isEmergency,
+            item.vehicle_number || "AMB"
+          );
+          if (result) etaMin = result.etaMin + " min";
+        }
+      }
+
+      /* ── Table row ── */
+      const navLink = (item.pickup_latitude && item.pickup_longitude)
+        ? `<a class="nav-link-btn" href="https://www.google.com/maps/dir/?api=1&destination=${item.pickup_latitude},${item.pickup_longitude}" target="_blank">🗺️ Maps</a>`
+        : "—";
+
+      rows.push({ id: item.booking_id, html: `
+        <tr>
+          <td><strong>#${item.booking_id}</strong></td>
+          <td>${item.user_name}<br><small style="color:#64748b;">${item.user_phone || ""}</small></td>
+          <td style="max-width:180px;white-space:normal;font-size:0.78rem;">${item.pickup_location}</td>
+          <td>${item.vehicle_number || "—"}<br><small style="color:#64748b;">${item.ambulance_location_text || ""}</small></td>
+          <td>${item.driver_name}<br><small>${item.driver_phone ? `<a href="tel:${item.driver_phone}">${item.driver_phone}</a>` : ""}</small></td>
+          <td>${pill(item.status)}</td>
+          <td>${etaMin}</td>
+          <td>${navLink}</td>
+        </tr>
+      ` });
+    });
+
+    await Promise.all(routePromises);
+
+    /* Sort by booking_id descending */
+    rows.sort((a, b) => b.id - a.id);
+    tableBody.innerHTML = rows.map(r => r.html).join("");
+
+    if (bounds.length) {
+      map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30] });
+    }
+
+  } catch (err) {
+    tableBody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#dc2626;">Live tracking temporarily unavailable.</td></tr>';
+    console.error("Admin fleet tracking error:", err);
+  }
+}
+
+/* ── Bounce animation for ambulance markers ── */
+const styleEl = document.createElement("style");
+styleEl.textContent = `@keyframes bounce-amb { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }`;
+document.head.appendChild(styleEl);
+
+loadLiveTracking();
+setInterval(loadLiveTracking, 8000);
+</script>
+{% endblock %}

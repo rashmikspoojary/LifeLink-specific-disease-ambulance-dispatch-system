@@ -1,0 +1,76 @@
+{% extends "admin/admin_base.html" %}
+
+{% block content %}
+<h1>Hospital Management</h1>
+
+<div class="actions-row">
+    <form method="POST" action="/admin/hospitals/clear" style="display:inline;background:transparent;padding:0;max-width:none;">
+        <button class="btn btn-danger" onclick="return confirm('Clear all hospitals?')">Clear All Hospitals</button>
+    </form>
+</div>
+
+<div class="card" style="margin-bottom:14px;">
+    <h3 style="margin-bottom:10px;">Add Hospital</h3>
+    <form method="POST" action="/admin/hospitals/add">
+        <label>Hospital Name</label>
+        <input type="text" name="name" required>
+
+        <label>Location Text</label>
+        <input type="text" name="location_text" placeholder="Main Road, City">
+
+        <label>Latitude</label>
+        <input type="text" name="latitude" placeholder="13.0215300">
+
+        <label>Longitude</label>
+        <input type="text" name="longitude" placeholder="74.9686600">
+
+        <label>Emergency Contact</label>
+        <input type="text" name="emergency_contact" placeholder="9876543210">
+
+        <button type="submit" class="btn btn-success">Add Hospital</button>
+    </form>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Location</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
+                <th>Contact</th>
+                <th>Ambulances</th>
+                <th>Save</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for hospital in hospitals %}
+            <tr>
+                <td>{{ hospital.id }}</td>
+                <td><input form="hospital-{{ hospital.id }}" name="name" value="{{ hospital.name }}" required></td>
+                <td><input form="hospital-{{ hospital.id }}" name="location_text" value="{{ hospital.location_text or '' }}"></td>
+                <td><input form="hospital-{{ hospital.id }}" name="latitude" value="{{ hospital.latitude or '' }}"></td>
+                <td><input form="hospital-{{ hospital.id }}" name="longitude" value="{{ hospital.longitude or '' }}"></td>
+                <td><input form="hospital-{{ hospital.id }}" name="emergency_contact" value="{{ hospital.emergency_contact or '' }}"></td>
+                <td>{{ hospital.ambulance_count }}</td>
+                <td>
+                    <form id="hospital-{{ hospital.id }}" method="POST" action="/admin/hospitals/update/{{ hospital.id }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <button class="btn btn-warning" type="submit">Save</button>
+                    </form>
+                </td>
+                <td>
+                    <form method="POST" action="/admin/hospitals/delete/{{ hospital.id }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <button class="btn btn-danger" onclick="return confirm('Delete this hospital?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="9" style="text-align:center;">No hospitals found</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

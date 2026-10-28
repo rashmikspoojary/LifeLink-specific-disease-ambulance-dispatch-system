@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LifeLink | Symptoms Checker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+
+    <style>
+        :root {
+            --bg: #edf4ff;
+            --line: #d8e3f1;
+            --text: #13253c;
+            --primary: #1864f2;
+            --danger: #c62828;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at 10% 10%, #d9e9ff 0%, var(--bg) 48%);
+        }
+
+        body>.site-header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom: 1px solid var(--line);
+            backdrop-filter: blur(8px);
+            padding: 12px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 6px 18px rgba(16, 59, 144, 0.08);
+        }
+
+        body>.site-header .brand {
+            font-weight: 800;
+            font-size: 22px;
+            color: #103b90 !important;
+            letter-spacing: 0.2px;
+        }
+
+        body>.site-header .nav {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        body>.site-header .nav a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 88px;
+            text-decoration: none !important;
+            color: #103b90 !important;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: #eef4ff;
+            border: 1px solid #d8e3f1;
+            transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        body>.site-header .nav a:hover {
+            background: #dfeafe;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(17, 73, 185, 0.12);
+        }
+
+        body>.site-header .nav a.logout {
+            background: var(--danger);
+            color: #fff !important;
+            border-color: var(--danger);
+        }
+
+        body>.site-header .nav a.logout:hover {
+            background: #a91f1f;
+        }
+
+        .symptoms-wrap {
+            max-width: 900px;
+            margin: 24px auto 30px;
+            padding: 20px 16px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 15px;
+            border: 1px solid #ccc;
+            margin-bottom: 15px;
+        }
+
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 16px;
+            margin-top: 15px;
+        }
+
+        .symptom-btn {
+            background: white;
+            border: 2px solid #d8e3f1;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .symptom-btn:hover {
+            border-color: #0d6efd;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(13, 110, 253, 0.12);
+        }
+
+        .symptom-btn.selected {
+            background: #0d6efd;
+            border-color: #0d6efd;
+            color: white;
+            box-shadow: 0 8px 15px rgba(13, 110, 253, 0.3);
+        }
+
+        .symptom-btn strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 16px;
+        }
+
+        .symptom-btn p {
+            margin: 0;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .symptom-btn.selected p {
+            color: #eef4ff;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            border-left: 5px solid #0d6efd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+
+        .book-ambulance-btn {
+            display: inline-block;
+            background: #0d6efd;
+            color: white;
+            padding: 12px 22px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            margin-bottom: 15px;
+            transition: 0.25s;
+        }
+
+        .book-ambulance-btn:hover {
+            background: #084298;
+            transform: scale(1.05);
+        }
+
+        .emergency-alert {
+            background: #fff5f5;
+            border-left: 5px solid #dc3545;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 25px;
+            display: none;
+            animation: fadeIn 0.4s ease;
+            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.1);
+        }
+
+        .emergency-alert h4 {
+            color: #dc3545;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .emergency-alert p {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .book-ambulance-action {
+            display: inline-block;
+            background: #dc3545;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 16px;
+            transition: background 0.3s ease, transform 0.2s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .book-ambulance-action:hover {
+            background: #c82333;
+            transform: scale(1.02);
+            color: white;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 700px) {
+            body>.site-header {
+                padding: 10px 12px;
+            }
+
+            body>.site-header .brand {
+                font-size: 20px;
+            }
+
+            body>.site-header .nav a {
+                min-width: 74px;
+                padding: 8px 12px;
+            }
+
+            .icon-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="site-header">
+        <div class="brand">
+            <img src="{{ url_for('static', filename='LifeLink Logo.png') }}" alt="LifeLink Logo"
+                style="height: 40px; width: auto; vertical-align: middle; mix-blend-mode: multiply;">
+        </div>
+        <nav class="nav">
+            <a href="/home">Home</a>
+            <a href="/logout" class="logout">Logout</a>
+        </nav>
+    </header>
+
+    <section class="symptoms-wrap">
+
+        <a href="/booking" class="book-ambulance-btn">Book Ambulance</a>
+        <a href="/my-booking" class="btn btn-secondary" style="margin-left:10px;">Track Ambulance</a>
+
+        <h1>Describe Your Symptoms</h1>
+
+        <!-- ✅ ONLY ONE TEXTAREA -->
+        <textarea id="symptomInput" placeholder="Example: fever, headache"></textarea>
+
+        <!-- ✅ OTHER INPUT (OUTSIDE GRID) -->
+        <div id="otherInputBox" style="display:none; margin-top:10px;">
+            <input type="text" id="otherInput" placeholder="Type your problem here..."
+                style="width:100%; padding:10px; border-radius:8px; border:1px solid #ccc;">
+        </div>
+
+        <button onclick="analyzeSymptoms()" style="
+        background: #0d6efd; 
+        color: white; 
+        padding: 12px 24px; 
+        border-radius: 8px; 
+        border: none; 
+        font-weight: bold; 
+        font-size: 16px; 
+        cursor: pointer; 
+        margin-top: 15px; 
+        transition: 0.25s;
+        box-shadow: 0 4px 6px rgba(13, 110, 253, 0.2);
+    " onmouseover="this.style.background='#084298'" onmouseout="this.style.background='#0d6efd'">
+            Submit Symptoms
+        </button>
+
+        <h3 style="margin-top:30px;">Emergency Symptom Buttons</h3>
+
+        <!-- ✅ GRID -->
+        <div class="icon-grid">
+
+            <!-- OTHER -->
+            <div class="symptom-btn" onclick="showOtherInput(this)">
+                <strong>Other</strong>
+                <p>Type your problem</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Cardiac Arrest')">
+                <strong>Cardiac Arrest</strong>
+                <p>Heart stopped / no pulse</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Heart Attack')">
+                <strong>Heart Attack</strong>
+                <p>Severe chest pressure</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Stroke')">
+                <strong>Stroke</strong>
+                <p>Face droop / weak side</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Breathing')">
+                <strong>Breathing</strong>
+                <p>Severe difficulty breathing</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Unconscious')">
+                <strong>Unconscious</strong>
+                <p>Not responding/low or high blood pressure</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Accidents')">
+                <strong>Accidents</strong>
+                <p>Serious accident/trauma/Serious Injuries</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Bleeding')">
+                <strong>Bleeding</strong>
+                <p>Heavy blood loss</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Burns')">
+                <strong>Burns</strong>
+                <p>Severe burns</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Seizure')">
+                <strong>Seizure</strong>
+                <p>Fits / convulsions</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Poisoning')">
+                <strong>Poisoning</strong>
+                <p>Toxic intake/overdose/snake bites</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Allergy')">
+                <strong>Allergy</strong>
+                <p>Severe reaction</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Chest Pain')">
+                <strong>Chest Pain</strong>
+                <p>Possible heart issue</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Maternity')">
+                <strong>Maternity</strong>
+                <p>Pregnancy / labor emergency</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Spine Injury')">
+                <strong>Spine Injury</strong>
+                <p>Cannot move body</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Drowning')">
+                <strong>Drowning</strong>
+                <p>Water breathing issue</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Electric Shock')">
+                <strong>Electric Shock</strong>
+                <p>High voltage injury</p>
+            </div>
+
+            <div class="symptom-btn" onclick="selectEmergency(this, 'Severe Pain')">
+                <strong>Severe Pain</strong>
+                <p>Sudden intense pain</p>
+            </div>
+
+            <div class="symptom-btn" data-emergency="false" onclick="selectEmergency(this, 'Fever')">
+                <strong>Fever</strong>
+                <p>High temp / chills</p>
+            </div>
+
+        </div>
+        <div id="result" class="result-card" style="display:none;"></div>
+
+    </section>
+
+    <script src="{{ url_for('static', filename='predict.js') }}?v=3"></script>
+    <script src="{{ url_for('static', filename='user_notifications.js') }}"></script>
+
+</body>
+
+</html>

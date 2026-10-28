@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LifeLink | Live Ambulance Tracker</title>
+  <meta name="description" content="Track your ambulance in real-time with live route, ETA, and emergency alerts." />
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+
+  <style>
+    /* ──────── DESIGN TOKENS ──────── */
+    :root {
+      --primary: #1463ff;
+      --success: #117733;
+      --danger: #c62828;
+      --warn: #e65100;
+      --bg: #f0f4ff;
+      --card-bg: #ffffff;
+      --border: #dde3f0;
+      --text: #1a2540;
+      --muted: #64748b;
+      --radius: 12px;
+      --shadow: 0 4px 24px rgba(20, 99, 255, .10);
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* ──────── TOP NAV ──────── */
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, .06);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .brand {
+      font-weight: 800;
+      font-size: 20px;
+      color: var(--primary);
+    }
+
+    header a {
+      text-decoration: none;
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    /* ──────── EMERGENCY BANNER ──────── */
+    #emergency-banner {
+      display: none;
+      background: linear-gradient(135deg, #b71c1c, #d32f2f);
+      color: #fff;
+      padding: 14px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      text-align: center;
+      animation: pulse-banner 1.5s ease-in-out infinite;
+      letter-spacing: .4px;
+    }
+
+    @keyframes pulse-banner {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .82;
+      }
+    }
+
+    /* ──────── REGION BADGE ──────── */
+    #region-badge {
+      display: none;
+      background: #e8f5e9;
+      border-bottom: 1px solid #a5d6a7;
+      color: #2e7d32;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      padding: 7px 16px;
+    }
+
+    /* ──────── MAIN LAYOUT ──────── */
+    #wrap {
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      gap: 14px;
+      padding: 14px;
+      max-height: calc(100vh - 58px);
+    }
+
+    /* ──────── SIDE PANEL ──────── */
+    #panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      max-height: calc(100vh - 86px);
+      box-shadow: var(--shadow);
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--primary);
+      margin: 0 0 2px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    input[type=text] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color .2s;
+    }
+
+    input[type=text]:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 11px;
+      border: 0;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 14px;
+      transition: opacity .2s, transform .15s;
+    }
+
+    .btn:hover {
+      opacity: .88;
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: #fff;
+      text-decoration: none;
+      display: block;
+      text-align: center;
+    }
+
+    /* Info + Metric cards */
+    .metric-card {
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .metric-dist {
+      background: rgba(20, 99, 255, .08);
+      color: var(--primary);
+      border: 1px solid rgba(20, 99, 255, .2);
+    }
+
+    .metric-eta {
+      background: rgba(17, 119, 51, .08);
+      color: var(--success);
+      border: 1px solid rgba(17, 119, 51, .2);
+    }
+
+    .metric-info {
+      background: #f8f9ff;
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-weight: 400;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* Status pill */
+    .status-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: capitalize;
+    }
+
+    .status-pending {
+      background: #fff3e0;
+      color: #e65100;
+    }
+
+    .status-accepted {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+
+    .status-on-the-way {
+      background: #ede7f6;
+      color: #4527a0;
+    }
+
+    .status-reached {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .status-completed {
+      background: #f1f8e9;
+      color: #33691e;
+    }
+
+    #refresh-indicator {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    .blink {
+      animation: blink 1s linear infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    /* ──────── MAP ──────── */
+    #map {
+      height: calc(100vh - 86px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    /* ──────── CUSTOM MARKERS ──────── */
+    .amb-marker {
+      font-size: 28px;
+      filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .3));
+      animation: bounce-amb 2s ease-in-out infinite;
+    }
+
+    @keyframes bounce-amb {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-5px);
+      }
+    }
+
+    .user-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 3px solid #fff;
+      box-shadow: 0 0 0 4px rgba(20, 99, 255, .25);
+    }
+
+    .pickup-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--warn);
+      border: 3px solid #fff;
+      box-shadow: 0 0 0 4px rgba(230, 81, 0, .25);
+    }
+
+    /* ──────── RESPONSIVE ──────── */
+    @media (max-width: 900px) {
+      #wrap {
+        grid-template-columns: 1fr;
+        max-height: none;
+      }
+
+      #map {
+        height: 60vh;
+      }
+
+      #panel {
+        max-height: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── HEADER ── -->
+  <header>
+    <div class="brand">
+      <img src="{{ url_for('static', filename='LifeLink Logo.png') }}" alt="LifeLink Logo" style="height: 40px; width: auto; vertical-align: middle; mix-blend-mode: multiply;">
+      <span style="vertical-align: middle; margin-left: 8px;">Tracker</span>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;">
+      <span id="refresh-indicator">● Idle</span>
+      <a href="/home">← Home</a>
+    </div>
+  </header>
+
+  <!-- ── EMERGENCY BANNER ── -->
+  <div id="emergency-banner">⚠️ CRITICAL / HIGH EMERGENCY — Ambulance dispatched urgently. Stay calm and keep this page
+    open.</div>
+
+  <!-- ── REGION BADGE ── -->
+  <div id="region-badge">🌍 Moodbidri Region Detected — Faster refresh &amp; optimized routing active.</div>
+
+  <!-- ── MAIN LAYOUT ── -->
+  <div id="wrap">
+
+    <!-- PANEL -->
+    <section id="panel">
+      <div class="panel-title">Live Ambulance Tracker</div>
+
+      <div>
+        <label for="caseId">Case / Booking ID</label>
+        <input id="caseId" type="text" placeholder="Enter your booking ID" value="{{ default_case_id }}" />
+      </div>
+      <button class="btn btn-primary" id="trackBtn">🔍 Track Now</button>
+
+      <div class="metric-card metric-dist" id="distance">📍 Distance: detecting your location…</div>
+      <div class="metric-card metric-eta" id="eta">⏱ ETA: calculating…</div>
+      <div id="user-location-card"
+        style="border-radius:8px;padding:10px 12px;font-size:13px;background:#f0f7ff;border:1px solid #c7dcff;color:#1a3a6e;display:none;">
+        <div
+          style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:4px;">
+          📍 Your Current Location</div>
+        <div id="user-place-name" style="font-weight:600;line-height:1.4;">Detecting…</div>
+      </div>
+      <div class="metric-card metric-info" id="info">Waiting for ambulance location data…</div>
+
+      <a class="btn btn-danger" href="tel:108">📞 Emergency Call</a>
+
+      <div style="font-size:11px;color:var(--muted);text-align:center;">
+        Route powered by <strong>OSRM</strong> &amp; <strong>OpenStreetMap</strong> — 100% Free
+      </div>
+    </section>
+
+    <!-- MAP -->
+    <section id="map"></section>
+  </div>
+
+  <!-- ── SCRIPTS ── -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="{{ url_for('static', filename='user_notifications.js') }}"></script>
+  <script>
+    "use strict";
+
+    /* ══════════════════════════════════════════
+       ① REGION CONFIGURATION
+       Add new regions here to scale globally.
+    ══════════════════════════════════════════ */
+    const REGIONS = [
+      {
+        name: "Moodbidri",
+        label: "🌍 Moodbidri Region Detected — Faster refresh & optimized routing active.",
+        bounds: { minLat: 13.00, maxLat: 13.10, minLng: 74.95, maxLng: 75.05 },
+        refreshMs: 3000,   // 3-second refresh inside Moodbidri
+        defaultSpeed: 30      // km/h — narrow roads
+      },
+      {
+        name: "Mangalore",
+        label: "🌍 Mangalore Region — Optimized routing active.",
+        bounds: { minLat: 12.82, maxLat: 12.98, minLng: 74.82, maxLng: 74.96 },
+        refreshMs: 4000,
+        defaultSpeed: 35
+      }
+      // Add Karnataka, India, World as needed …
+    ];
+    const DEFAULT_REGION = { name: "Global", refreshMs: 6000, defaultSpeed: 40 };
+
+    /* ══════════════════════════════════════════
+       ② DOM REFS
+    ══════════════════════════════════════════ */
+    const caseIdEl = document.getElementById("caseId");
+    const trackBtn = document.getElementById("trackBtn");
+    const infoEl = document.getElementById("info");
+    const distanceEl = document.getElementById("distance");
+    const etaEl = document.getElementById("eta");
+    const emergencyBanner = document.getElementById("emergency-banner");
+    const regionBadge = document.getElementById("region-badge");
+    const refreshInd = document.getElementById("refresh-indicator");
+
+    /* ══════════════════════════════════════════
+       ③ MAP INIT
+    ══════════════════════════════════════════ */
+    const map = L.map("map").setView([13.0244, 74.9896], 13); // Moodbidri centre
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© <a href='https://openstreetmap.org'>OpenStreetMap</a>"
+    }).addTo(map);
+
+    /* ── Icon factories ── */
+    const ambulanceIcon = L.divIcon({
+      className: "", iconSize: [36, 36], iconAnchor: [18, 18],
+      html: '<div class="amb-marker">🚑</div>'
+    });
+    const userIcon = L.divIcon({
+      className: "", iconSize: [16, 16], iconAnchor: [8, 8],
+      html: '<div class="user-dot"></div>'
+    });
+    const pickupIcon = L.divIcon({
+      className: "", iconSize: [18, 18], iconAnchor: [9, 9],
+      html: '<div class="pickup-dot"></div>'
+    });
+
+    /* ══════════════════════════════════════════
+       ④ STATE
+    ══════════════════════════════════════════ */
+    let ambMarker = null;
+    let userMarker = null;
+    let pickupMarker = null;
+    let routeLayer = null;
+    let userLocation = null;
+    let ambLocation = null;
+    let userWatchId = null;
+    let pollingTimer = null;
+    let activeRegion = DEFAULT_REGION;
+    let isEmergency = false;
+    let voiceSpoken = false;
+    let retryCount = 0;
+    const MAX_RETRY = 5;
+
+    const socket = io();
+
+    socket.on('connect', () => {
+      const id = caseIdEl.value.trim();
+      if (id) {
+        socket.emit('join', { booking_id: id });
+        console.log("Socket connected and joined room:", id);
+      }
+    });
+
+    socket.on('location_update', (data) => {
+      console.log("Real-time Socket Update:", data);
+      ambLocation = { lat: data.lat, lng: data.lng };
+      if (ambMarker) {
+        smoothMove(ambMarker, [data.lat, data.lng]);
+        updateRouteAndETA();
+        refreshInd.textContent = "● Live (Socket)";
+      }
+    });
+
+    /* ══════════════════════════════════════════
+       ⑤ REGION DETECTION
+    ══════════════════════════════════════════ */
+    function detectRegion(lat, lng) {
+      for (const r of REGIONS) {
+        const b = r.bounds;
+        if (lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng) {
+          return r;
+        }
+      }
+      return DEFAULT_REGION;
+    }
+
+    function applyRegion(region) {
+      activeRegion = region;
+      if (region.name !== "Global") {
+        regionBadge.textContent = region.label;
+        regionBadge.style.display = "block";
+      } else {
+        regionBadge.style.display = "none";
+      }
+    }
+
+    /* ══════════════════════════════════════════
+       ⑥ USER LOCATION (Geolocation API)
+    ══════════════════════════════════════════ */
+    function startUserTracking() {
+      if (!navigator.geolocation || userWatchId !== null) return;
+
+      userWatchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+
+          if (!userMarker) {
+            userMarker = L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+              .addTo(map).bindPopup("📍 You are here");
+          } else {
+            smoothMove(userMarker, [userLocation.lat, userLocation.lng]);
+          }
+
+          /* Reverse geocode to get place name */
+          const locCard = document.getElementById('user-location-card');
+          const locName = document.getElementById('user-place-name');
+          if (locCard && locName) {
+            locCard.style.display = 'block';
+            locName.textContent = 'Locating address…';
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`)
+              .then(r => r.json())
+              .then(d => { locName.textContent = d.display_name || `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`; })
+              .catch(() => { locName.textContent = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`; });
+            /* also update the user marker popup */
+            if (userMarker) userMarker.bindPopup(`📍 You are here`);
+          }
+
+          /* Detect region from user position */
+          const region = detectRegion(userLocation.lat, userLocation.lng);
+          if (region.name !== activeRegion.name) {
+            applyRegion(region);
+            restartPolling(); // re-start with new interval
+          }
+
+          updateRouteAndETA();
+        },
+        (err) => {
+          distanceEl.textContent = "📍 Distance: location access denied — enter coordinates manually.";
+          etaEl.textContent = "⏱ ETA: location access required.";
+          console.warn("Geolocation error:", err.message);
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      );
+    }
+
+    /* ══════════════════════════════════════════
+       ⑦ SMOOTH MARKER ANIMATION
+    ══════════════════════════════════════════ */
+    function smoothMove(marker, [toLat, toLng], steps = 20) {
+      const from = marker.getLatLng();
+      let step = 0;
+      const dLat = (toLat - from.lat) / steps;
+      const dLng = (toLng - from.lng) / steps;
+
+      const interval = setInterval(() => {
+        step++;
+        marker.setLatLng([from.lat + dLat * step, from.lng + dLng * step]);
+        if (step >= steps) clearInterval(interval);
+      }, 40); // 40ms × 20 = 800ms total
+    }
+
+    /* ══════════════════════════════════════════
+       ⑧ OSRM ROUTE DRAWING
+    ══════════════════════════════════════════ */
+    async function drawRoute(from, to, emergency = false) {
+      const url = `https://router.project-osrm.org/route/v1/driving/` +
+        `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("OSRM response not ok");
+        const data = await res.json();
+
+        if (!data.routes || !data.routes.length) return;
+
+        const route = data.routes[0];
+        const coords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+        const durationSec = route.duration;
+        const distanceM = route.distance;
+
+        /* Remove old route */
+        if (routeLayer) map.removeLayer(routeLayer);
+
+        routeLayer = L.polyline(coords, {
+          color: emergency ? "#c62828" : "#1463ff",
+          weight: emergency ? 6 : 5,
+          opacity: 0.9,
+          dashArray: emergency ? null : "12 8"
+        }).addTo(map);
+
+        /* Fit map to show both markers + route */
+        const bounds = L.latLngBounds([[from.lat, from.lng], [to.lat, to.lng]]);
+        map.fitBounds(bounds, { padding: [40, 40] });
+
+        /* ETA from actual road distance */
+        const etaMin = Math.ceil(durationSec / 60);
+        const distKm = (distanceM / 1000).toFixed(2);
+        const etaText = emergency
+          ? `🚨 Ambulance arriving URGENTLY in ~${etaMin} min!`
+          : (etaMin < 60 ? `⏱ Ambulance arriving in ~${etaMin} min` : `⏱ Arriving in ~${Math.floor(etaMin / 60)}h ${etaMin % 60}m`);
+
+        distanceEl.textContent = `📏 Road distance: ${distKm} km`;
+        etaEl.textContent = etaText;
+
+        /* Voice alert (spoken only once per tracking session) */
+        if (!voiceSpoken && 'speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(
+            emergency
+              ? `Emergency! Ambulance is arriving urgently in approximately ${etaMin} minutes.`
+              : `Ambulance is on the way. Estimated arrival: ${etaMin} minutes.`
+          );
+          utterance.lang = "en-IN";
+          utterance.rate = 0.9;
+          window.speechSynthesis.speak(utterance);
+          voiceSpoken = true;
+        }
+
+      } catch (err) {
+        console.warn("OSRM routing failed, using straight line fallback:", err.message);
+        drawStraightLine(from, to, emergency);
+      }
+    }
+
+    /* Straight-line fallback when OSRM fails */
+    function drawStraightLine(from, to, emergency) {
+      if (routeLayer) map.removeLayer(routeLayer);
+      routeLayer = L.polyline([[from.lat, from.lng], [to.lat, to.lng]], {
+        color: emergency ? "#c62828" : "#1463ff",
+        weight: 4, opacity: 0.8, dashArray: "10 8"
+      }).addTo(map);
+
+      const distKm = getDistanceKm(from, to);
+      const etaMin = Math.ceil((distKm / activeRegion.defaultSpeed) * 60);
+      distanceEl.textContent = `📏 Straight distance: ${distKm.toFixed(2)} km (routing unavailable)`;
+      etaEl.textContent = `⏱ Estimated arrival: ~${etaMin} min`;
+    }
+
+    /* ══════════════════════════════════════════
+       ⑨ HAVERSINE DISTANCE
+    ══════════════════════════════════════════ */
+    function getDistanceKm(a, b) {
+      const R = 6371;
+      const dLat = (b.lat - a.lat) * Math.PI / 180;
+      const dLng = (b.lng - a.lng) * Math.PI / 180;
+      const h = Math.sin(dLat / 2) ** 2 +
+        Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) *
+        Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    }
+
+    /* ══════════════════════════════════════════
+       ⑩ ROUTE + ETA UPDATE TRIGGER
+    ══════════════════════════════════════════ */
+    function updateRouteAndETA() {
+      if (!userLocation || !ambLocation) return;
+      drawRoute(userLocation, ambLocation, isEmergency);
+    }
+
+    /* ══════════════════════════════════════════
+       ⑪ FETCH BOOKING DATA (Backend API)
+    ══════════════════════════════════════════ */
+    async function trackSelectedBooking() {
+      const id = caseIdEl.value.trim();
+      if (!id) { infoEl.textContent = "⚠️ Please enter a valid Case ID."; return; }
+
+      refreshInd.innerHTML = '<span class="blink">●</span> Refreshing…';
+      infoEl.textContent = `Tracking Case ID ${id}…`;
+
+      try {
+        const res = await fetch(`/api/track-booking/${encodeURIComponent(id)}`);
+        const data = await res.json();
+
+        if (!res.ok || !data.ok) {
+          infoEl.textContent = data.error || "Unable to track this Case ID.";
+          retryCount++;
+          if (retryCount <= MAX_RETRY) {
+            infoEl.textContent += ` (Retrying… ${retryCount}/${MAX_RETRY})`;
+          }
+          refreshInd.textContent = "● Error";
+          return;
+        }
+
+        retryCount = 0;
+        const b = data.data;
+
+        /* ── Set ambulance position ── */
+        ambLocation = { lat: b.lat, lng: b.lng };
+
+        if (!ambMarker) {
+          ambMarker = L.marker([b.lat, b.lng], { icon: ambulanceIcon })
+            .addTo(map).bindPopup(`🚑 ${b.ambulance_name}`);
+        } else {
+          smoothMove(ambMarker, [b.lat, b.lng]);
+        }
+
+        /* ── Pickup marker ── */
+        if (b.pickup_lat && b.pickup_lng) {
+          if (!pickupMarker) {
+            pickupMarker = L.marker([b.pickup_lat, b.pickup_lng], { icon: pickupIcon })
+              .addTo(map).bindPopup("🟠 Pickup Location");
+          } else {
+            pickupMarker.setLatLng([b.pickup_lat, b.pickup_lng]);
+          }
+        }
+
+        /* ── Emergency detection ── */
+        isEmergency = ["high", "critical"].includes((b.emergency_level || "").toLowerCase());
+        if (isEmergency) {
+          emergencyBanner.style.display = "block";
+        } else {
+          emergencyBanner.style.display = "none";
+        }
+
+        /* ── Status pill ── */
+        const statusClass = `status-${(b.status || "").replace(/ /g, "-")}`;
+        
+        let driverInfo = "";
+        let ambulanceInfo = "";
+        
+        if (b.status === "requested" || b.status === "pending") {
+          ambulanceInfo = `<strong>Ambulance:</strong> Searching for nearest...<br>`;
+          driverInfo = `<strong>Driver:</strong> Contacting driver...`;
+        } else if (b.status === "failed") {
+          ambulanceInfo = `<strong>Ambulance:</strong> None Available<br>`;
+          driverInfo = `<strong>Driver:</strong> All drivers are currently busy. Please call emergency services immediately.`;
+        } else {
+          ambulanceInfo = `<strong>Ambulance:</strong> ${b.vehicle_number || "—"}<br>`;
+          driverInfo = `<strong>Driver:</strong> ${b.driver_name || "—"}` + (b.driver_phone ? `<br><strong>Driver Ph:</strong> ${b.driver_phone}` : "");
+        }
+        
+        infoEl.innerHTML =
+          `<strong>Booking:</strong> #${b.id} <span class="status-pill ${statusClass}">${b.status}</span><br>` +
+          `<strong>Hospital:</strong> ${b.hospital_name || "—"}<br>` +
+          `<strong>Pickup:</strong> ${b.pickup_location || "—"}<br>` +
+          `<strong>Disease:</strong> ${b.disease_type || "—"}<br>` +
+          `<strong>Emergency:</strong> ${b.emergency_level || "—"}<br>` +
+          ambulanceInfo + driverInfo;
+
+        refreshInd.textContent = "● Live";
+
+        /* ── Draw real road route ── */
+        updateRouteAndETA();
+
+      } catch (err) {
+        infoEl.textContent = "Tracking service temporarily unavailable. Retrying…";
+        refreshInd.textContent = "● Error";
+        retryCount++;
+        console.error("Tracking error:", err);
+      }
+    }
+
+    /* ══════════════════════════════════════════
+       ⑫ POLLING — region-adaptive interval
+    ══════════════════════════════════════════ */
+    function startPolling() {
+      if (pollingTimer) clearInterval(pollingTimer);
+      trackSelectedBooking();
+      pollingTimer = setInterval(trackSelectedBooking, activeRegion.refreshMs);
+    }
+
+    function restartPolling() {
+      if (pollingTimer) clearInterval(pollingTimer);
+      pollingTimer = setInterval(trackSelectedBooking, activeRegion.refreshMs);
+    }
+
+    /* ══════════════════════════════════════════
+       ⑬ INIT
+    ══════════════════════════════════════════ */
+    trackBtn.addEventListener("click", () => {
+      voiceSpoken = false; // allow voice alert again on manual track
+      if (pollingTimer) clearInterval(pollingTimer);
+      
+      const id = caseIdEl.value.trim();
+      if (id) {
+          socket.emit('join', { booking_id: id });
+      }
+      
+      startPolling();
+    });
+
+    startUserTracking();
+
+    if (caseIdEl.value.trim()) {
+      startPolling();
+    } else {
+      /* Show India overview until user enters ID */
+      map.setView([20.5937, 78.9629], 5);
+    }
+  </script>
+</body>
+
+</html>

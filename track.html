@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Ambulance | LifeLink</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --secondary: #3b82f6;
+            --accent: #ef4444;
+            --bg: #f8fafc;
+            --text: #0f172a;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: #fff;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-weight: 800;
+            font-size: 1.5rem;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        #map {
+            flex-grow: 1;
+            width: 100%;
+            height: 100%;
+        }
+
+        .info-panel {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 450px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .status-badge {
+            align-self: flex-start;
+            padding: 0.25rem 0.75rem;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .eta-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .eta-time {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .driver-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 1rem;
+        }
+
+        .driver-avatar {
+            width: 50px;
+            height: 50px;
+            background: #e2e8f0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .driver-details h3 {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .driver-details p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        .pulse {
+            width: 12px;
+            height: 12px;
+            background: #10b981;
+            border-radius: 50%;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            box-shadow: 0 0 0 rgba(16, 185, 129, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .back-btn {
+            text-decoration: none;
+            color: #64748b;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="/" class="back-btn">← Back to Home</a>
+        <div class="logo">🚑 LifeLink<span>Track</span></div>
+        <div style="width: 80px;"></div> <!-- Spacer -->
+    </header>
+
+    <div id="map"></div>
+
+    <div class="info-panel">
+        <div class="pulse"></div>
+        <div class="status-badge" id="booking-status">{{ booking.status }}</div>
+        
+        <div class="eta-container">
+            <div>
+                <div style="font-size: 0.875rem; color: #64748b;">Estimated Arrival</div>
+                <div class="eta-time" id="eta">Calculating...</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.875rem; color: #64748b;">Distance</div>
+                <div style="font-size: 1.125rem; font-weight: 700;" id="distance">-- km</div>
+            </div>
+        </div>
+
+        <div class="driver-info">
+            <div class="driver-avatar">
+                {{ booking.driver_name[0] if booking.driver_name else 'A' }}
+            </div>
+            <div class="driver-details">
+                <h3>{{ booking.driver_name or 'Assigning Driver...' }}</h3>
+                <p>{{ booking.vehicle_number or 'Ambulance Unit' }} • <a href="tel:{{ booking.driver_phone }}">{{ booking.driver_phone or '' }}</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const bookingId = parseInt("{{ booking.id | default(0) }}");
+        const userLat = parseFloat("{{ booking.pickup_latitude | default(0) }}");
+        const userLng = parseFloat("{{ booking.pickup_longitude | default(0) }}");
+        
+        let map, userMarker, ambulanceMarker;
+        const socket = io();
+
+        // Custom Icons
+        const ambulanceIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/1048/1048313.png',
+            iconSize: [45, 45],
+            iconAnchor: [22, 22]
+        });
+
+        const userIcon = L.icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/3177/3177440.png',
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+        });
+
+        function initMap() {
+            map = L.map('map').setView([userLat, userLng], 15);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            userMarker = L.marker([userLat, userLng], { icon: userIcon })
+                .addTo(map)
+                .bindPopup("Your Location")
+                .openPopup();
+
+            ambulanceMarker = L.marker([userLat, userLng], { icon: ambulanceIcon })
+                .addTo(map)
+                .bindPopup("Ambulance");
+        }
+
+        function updateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const d = R * c;
+            
+            document.getElementById('distance').innerText = d.toFixed(2) + ' km';
+            
+            // Simple ETA calculation: assuming 30km/h average speed
+            const etaMinutes = Math.round((d / 30) * 60) + 2; // +2 mins for traffic
+            document.getElementById('eta').innerText = etaMinutes > 1 ? etaMinutes + ' mins' : 'Arriving...';
+        }
+
+        socket.on('connect', () => {
+            console.log("Connected to server");
+            socket.emit('join', { booking_id: bookingId });
+        });
+
+        socket.on('location_update', (data) => {
+            console.log("Location Update:", data);
+            const newPos = [data.lat, data.lng];
+            
+            // Move marker smoothly
+            ambulanceMarker.setLatLng(newPos);
+            
+            // Auto-adjust zoom to see both if moving
+            const bounds = L.latLngBounds([userMarker.getLatLng(), ambulanceMarker.getLatLng()]);
+            map.fitBounds(bounds, { padding: [50, 50] });
+
+            updateDistance(userLat, userLng, data.lat, data.lng);
+        });
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>

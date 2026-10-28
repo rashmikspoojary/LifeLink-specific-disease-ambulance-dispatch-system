@@ -1,0 +1,70 @@
+{% extends "admin/admin_base.html" %}
+
+{% block content %}
+<h1>Users Management</h1>
+
+<div class="actions-row">
+    <form method="POST" action="{{ url_for('clear_users') }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+        <button class="btn btn-danger" onclick="return confirm('Clear all non-admin users?')">Clear Non-Admin Users</button>
+    </form>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Location</th>
+                <th>Medical Info</th>
+                <th>Lat</th>
+                <th>Lng</th>
+                <th>Role</th>
+                <th>Created At</th>
+                <th>Last Login Type</th>
+                <th>Last Login At</th>
+                <th>Edit</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td><input form="edit-user-{{ user.id }}" name="name" value="{{ user.name }}" required></td>
+                <td><input form="edit-user-{{ user.id }}" name="email" type="email" value="{{ user.email }}" required></td>
+                <td><input form="edit-user-{{ user.id }}" name="phone" value="{{ user.phone or '' }}" placeholder="Phone"></td>
+                <td><input form="edit-user-{{ user.id }}" name="location_text" value="{{ user.location_text or '' }}" placeholder="Location"></td>
+                <td><textarea form="edit-user-{{ user.id }}" name="medical_info" placeholder="Medical info">{{ user.medical_info or '' }}</textarea></td>
+                <td><input form="edit-user-{{ user.id }}" name="latitude" value="{{ user.latitude or '' }}" placeholder="Latitude"></td>
+                <td><input form="edit-user-{{ user.id }}" name="longitude" value="{{ user.longitude or '' }}" placeholder="Longitude"></td>
+                <td>
+                    <select form="edit-user-{{ user.id }}" name="role">
+                        <option value="user" {% if user.role == 'user' %}selected{% endif %}>user</option>
+                        <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>admin</option>
+                        <option value="driver" {% if user.role == 'driver' %}selected{% endif %}>driver</option>
+                    </select>
+                </td>
+                <td>{{ user.created_at }}</td>
+                <td>{{ user.last_login_type or '-' }}</td>
+                <td>{{ user.last_login_at or '-' }}</td>
+                <td>
+                    <form id="edit-user-{{ user.id }}" method="POST" action="{{ url_for('update_user', user_id=user.id) }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <button class="btn btn-warning" type="submit">Edit</button>
+                    </form>
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('delete_user', user_id=user.id) }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <button class="btn btn-danger" onclick="return confirm('Delete this user?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="14" style="text-align:center;">No users found</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

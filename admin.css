@@ -1,0 +1,246 @@
+:root {
+    --bg: #f4f7fc;
+    --panel: #ffffff;
+    --text: #1f2937;
+    --muted: #4b5563;
+    --line: #d8e0ea;
+    --primary: #1f66c1;
+    --primary-dark: #154c96;
+    --success: #2e7d32;
+    --warning: #c98410;
+    --danger: #c62828;
+    --sidebar-a: #0f62fe;
+    --sidebar-b: #103b90;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+html {
+    font-size: clamp(14px, 0.75vw + 10px, 17px);
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.45;
+}
+
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 255px;
+    background: linear-gradient(180deg, var(--sidebar-a), var(--sidebar-b));
+    padding: 20px;
+    color: #ecf4ff;
+}
+
+.sidebar .logo {
+    font-size: 1.45rem;
+    font-weight: 800;
+    margin-bottom: 24px;
+}
+
+.sidebar nav a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-bottom: 7px;
+    color: #ecf4ff;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background 0.2s ease;
+}
+
+.sidebar nav a:hover,
+.sidebar nav a.active {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.sidebar .logout {
+    background: var(--danger);
+    margin-top: 14px;
+}
+
+.content {
+    flex: 1;
+    padding: 1.2rem;
+    overflow-x: auto;
+}
+
+.content h1,
+.content h2 {
+    margin-bottom: 0.9rem;
+    color: var(--primary-dark);
+    font-size: clamp(1.35rem, 1.4vw, 1.9rem);
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+}
+
+.card h3 {
+    color: var(--primary-dark);
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.card p {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--text);
+}
+
+.table-container {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    padding: 12px;
+    border-radius: 12px;
+    overflow-x: auto;
+    margin-bottom: 14px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+}
+
+table thead {
+    background: var(--primary);
+    color: #fff;
+}
+
+table th,
+table td {
+    padding: 10px;
+    border-bottom: 1px solid #e4e8ef;
+    text-align: left;
+    vertical-align: top;
+    font-size: 0.92rem;
+    color: #1f2937;
+}
+
+table tr:hover {
+    background: #f7faff;
+}
+
+form {
+    background: #fff;
+    padding: 14px;
+    border-radius: 10px;
+    max-width: 760px;
+}
+
+form label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 700;
+    color: #334155;
+}
+
+form input,
+form select,
+form textarea,
+.table-container input,
+.table-container select,
+.table-container textarea {
+    width: 100%;
+    border: 1px solid #cfd7e3;
+    border-radius: 8px;
+    padding: 8px 9px;
+    margin-bottom: 6px;
+    background: #fff;
+    color: #1f2937;
+    font-size: 0.9rem;
+}
+
+.table-container textarea {
+    min-height: 72px;
+}
+
+.btn {
+    padding: 7px 11px;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-block;
+    white-space: nowrap;
+    margin-top: 8px;
+    color: #0d6efd;
+    font-size: 14px;
+}
+.btn:hover {text-decoration: underline;}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #1f6a24; }
+.btn-warning { background: var(--warning); color: #fff; }
+.btn-warning:hover { background: #996c0e; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: #9f1f1f; }
+
+.actions-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.badge.success { background: #dcfce7; color: #166534; }
+.badge.danger { background: #fee2e2; color: #991b1b; }
+
+@media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    .sidebar { width: 100%; padding: 14px; }
+    .sidebar nav { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .sidebar .logout { grid-column: span 2; }
+    .content { padding: 0.8rem; }
+}
+/* Login Button (Message Page Fix) */
+.btn-login {
+    display: inline-block;
+    margin-top: 15px;
+    padding: 10px 18px;
+    background: var(--primary);
+    color: #fff !important;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: 0.3s;
+}
+
+.btn-login:hover {
+    background: var(--primary-dark);
+}

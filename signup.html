@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeLink Sign Up</title>
+    <style>
+        :root {
+            --bg: #eef4ff;
+            --panel: #ffffff;
+            --text: #12243a;
+            --muted: #5e6b7b;
+            --primary: #1864f2;
+            --primary-dark: #1149b9;
+            --line: #d8e3f1;
+            --shadow: 0 16px 40px rgba(10, 40, 90, 0.14);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at 8% 10%, #dbe9ff 0%, var(--bg) 50%);
+            padding: 18px;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 430px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            padding: 22px;
+        }
+
+        h1 {
+            margin: 0 0 6px;
+            text-align: center;
+            font-size: 28px;
+            color: #123a8e;
+        }
+
+        p {
+            margin: 0 0 14px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        label {
+            display: block;
+            margin: 8px 0 6px;
+            font-size: 13px;
+            color: #30435f;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 11px 12px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(24, 100, 242, 0.12);
+        }
+
+        button {
+            width: 100%;
+            border: 0;
+            border-radius: 10px;
+            padding: 11px 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 12px;
+            background: var(--primary);
+            color: #fff;
+        }
+
+        button:hover { background: var(--primary-dark); }
+
+        .foot {
+            margin-top: 14px;
+            text-align: center;
+            font-size: 14px;
+            color: #526072;
+        }
+
+        .foot a {
+            color: #1149b9;
+            text-decoration: none;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div style="text-align: center; margin-bottom: 5px;">
+        <img src="{{ url_for('static', filename='LifeLink Logo.png') }}" alt="LifeLink Logo" style="width: 100%; max-width: 360px; height: auto; mix-blend-mode: multiply;">
+    </div>
+    <p style="font-weight: 700; margin-bottom: 4px;">Create Account</p>
+    <p>Sign up to access booking and live tracking</p>
+    <form method="POST" action="/signup">
+        <label for="name">Full Name</label>
+        <input id="name" type="text" name="name" placeholder="Enter full name" required>
+
+        <label for="email">Email</label>
+        <input id="email" type="email" name="email" placeholder="name@example.com" required>
+
+        <label for="phone">Phone (for SMS notifications)</label>
+        <input id="phone" type="text" name="phone" placeholder="7204212318">
+
+        <label for="location_text">Home / Current Location</label>
+        <input id="location_text" type="text" name="location_text" placeholder="Area, city, landmark">
+
+        <label for="medical_info">Medical Info (optional)</label>
+        <input id="medical_info" type="text" name="medical_info" placeholder="Asthma, diabetes, allergies, etc.">
+
+        <input id="latitude" type="hidden" name="latitude">
+        <input id="longitude" type="hidden" name="longitude">
+
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password" placeholder="Create password" required>
+
+        <label for="confirm_password">Confirm Password</label>
+        <input id="confirm_password" type="password" name="confirm_password" placeholder="Repeat password" required>
+
+        <button type="submit">Sign Up</button>
+    </form>
+    <div class="foot">Already have an account? <a href="/login">Login</a></div>
+</div>
+<script>
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function (position) {
+        document.getElementById("latitude").value = position.coords.latitude.toFixed(7);
+        document.getElementById("longitude").value = position.coords.longitude.toFixed(7);
+    });
+}
+</script>
+</body>
+</html>

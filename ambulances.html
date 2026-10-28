@@ -1,0 +1,118 @@
+{% extends "admin/admin_base.html" %}
+{% block content %}
+
+<h1>Ambulance Management</h1>
+
+<div class="actions-row">
+    <form method="POST" action="/admin/ambulances/clear" style="display:inline;background:transparent;padding:0;max-width:none;">
+        <button class="btn btn-danger" onclick="return confirm('Clear all ambulances?')">Clear All Ambulances</button>
+    </form>
+</div>
+
+<div class="card" style="margin-bottom:14px;">
+    <h3 style="margin-bottom:10px;">Add Ambulance</h3>
+    <form method="POST" action="/admin/ambulances/add">
+        <label>Vehicle Number</label>
+        <input type="text" name="vehicle_number" required>
+
+        <label>Ambulance Type</label>
+        <select name="type" required>
+            <option value="Basic">Basic</option>
+            <option value="ICU">ICU</option>
+            <option value="Ventilator">Ventilator</option>
+        </select>
+
+        <label>Hospital</label>
+        <select name="hospital_id">
+            <option value="">Select hospital</option>
+            {% for hospital in hospitals %}
+            <option value="{{ hospital.id }}">{{ hospital.name }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Current Location</label>
+        <input type="text" name="current_location_text" placeholder="e.g. Main Road Junction">
+
+        <label>Latitude</label>
+        <input type="text" name="current_latitude" placeholder="13.0215300">
+
+        <label>Longitude</label>
+        <input type="text" name="current_longitude" placeholder="74.9686600">
+
+        <button type="submit" class="btn btn-success">Add Ambulance</button>
+    </form>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Vehicle No</th>
+                <th>Type</th>
+                <th>Hospital</th>
+                <th>Live Location</th>
+                <th>Lat</th>
+                <th>Lng</th>
+                <th>Status</th>
+                <th>Assignment</th>
+                <th>Save GPS</th>
+                <th>Toggle</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in ambulances %}
+            <tr>
+                <td>{{ a.id }}</td>
+                <td><input value="{{ a.vehicle_number }}" readonly></td>
+                <td><input value="{{ a.type }}" readonly></td>
+                <td>
+                    <form method="POST" action="/admin/ambulances/hospital/{{ a.id }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <select name="hospital_id">
+                            <option value="">No hospital</option>
+                            {% for hospital in hospitals %}
+                            <option value="{{ hospital.id }}" {% if a.hospital_id == hospital.id %}selected{% endif %}>{{ hospital.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-warning" type="submit">Save Hospital</button>
+                    </form>
+                    <div style="font-size:12px;color:#64748b;margin-top:4px;">{{ a.hospital_name or 'Not linked' }}</div>
+                </td>
+                <td><input form="gps-amb-{{ a.id }}" name="current_location_text" value="{{ a.current_location_text or '' }}" placeholder="Current location"></td>
+                <td><input form="gps-amb-{{ a.id }}" name="current_latitude" value="{{ a.current_latitude or '' }}" placeholder="Lat"></td>
+                <td><input form="gps-amb-{{ a.id }}" name="current_longitude" value="{{ a.current_longitude or '' }}" placeholder="Lng"></td>
+                <td><input value="{{ a.status }}" readonly></td>
+                <td>
+                    {% if a.has_active_booking %}
+                        <span style="color:#b45309;font-weight:700;">Assigned (Locked On-Duty)</span>
+                    {% else %}
+                        <span style="color:#166534;font-weight:700;">Free</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form id="gps-amb-{{ a.id }}" method="POST" action="/admin/ambulances/location/{{ a.id }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <button class="btn btn-warning" type="submit">Save GPS</button>
+                    </form>
+                </td>
+                <td>
+                    {% if a.has_active_booking %}
+                        <button class="btn btn-secondary" type="button" disabled>Assigned</button>
+                    {% elif a.status == 'available' %}
+                        <a href="/admin/ambulances/status/{{ a.id }}" class="btn btn-primary">Mark On-Duty</a>
+                    {% else %}
+                        <a href="/admin/ambulances/status/{{ a.id }}" class="btn btn-success">Mark Available</a>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/admin/ambulances/delete/{{ a.id }}" class="btn btn-danger" onclick="return confirm('Delete this ambulance?')">Delete</a>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="12" style="text-align:center;">No ambulances found</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

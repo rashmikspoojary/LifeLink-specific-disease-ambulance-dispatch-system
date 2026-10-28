@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Submit Feedback</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #FFFFFF, #F5F5F5);
+            padding: 40px;
+        }
+
+        .top-nav {
+            max-width: 420px;
+            margin: 0 auto 12px;
+        }
+
+        .home-btn {
+            display: inline-block;
+            text-decoration: none;
+            background: #1565C0;
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 7px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .home-btn:hover {
+            background: #0D47A1;
+        }
+
+        .container {
+            max-width: 420px;
+            margin: auto;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            text-align: center;
+            color: #1565C0;
+        }
+
+        label {
+            font-weight: bold;
+            margin-top: 10px;
+            display: block;
+        }
+
+        select, textarea, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 8px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+
+        textarea {
+            resize: none;
+            height: 100px;
+        }
+
+        button {
+            background: #1565C0;
+            color: white;
+            font-size: 15px;
+            border: none;
+            margin-top: 15px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0D47A1;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="top-nav">
+    <a class="home-btn" href="/home">Home</a>
+</div>
+
+<div class="container">
+    <h2>Submit Feedback</h2>
+
+    <form method="POST" action="/feedback/submit">
+
+        <label>Rating</label>
+        <select name="rating" required>
+            <option value="">Select</option>
+            <option value="5">⭐⭐⭐⭐⭐ - Excellent</option>
+            <option value="4">⭐⭐⭐⭐ - Good</option>
+            <option value="3">⭐⭐⭐ - Average</option>
+            <option value="2">⭐⭐ - Poor</option>
+            <option value="1">⭐ - Very Bad</option>
+        </select>
+
+        <label>Message</label>
+        <textarea name="message" placeholder="Write your feedback..." required></textarea>
+
+        <button type="submit">Submit Feedback</button>
+    </form>
+</div>
+
+<script src="{{ url_for('static', filename='user_notifications.js') }}"></script>
+</body>
+</html>

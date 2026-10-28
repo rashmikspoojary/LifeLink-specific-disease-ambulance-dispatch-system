@@ -1,0 +1,121 @@
+{% extends "admin/admin_base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0 fw-bold text-primary">🚑 Global Fleet Monitor</h5>
+                        <p class="text-muted small mb-0">Real-time location of all registered drivers</p>
+                    </div>
+                    <div id="status-badge" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-2 rounded-pill">
+                        <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true"></span>
+                        Live
+                    </div>
+                </div>
+                <div id="admin-map" style="height: 600px; width: 100%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Driver</th>
+                                    <th>Status</th>
+                                    <th>Current Coordinates</th>
+                                    <th>Last Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody id="driver-list-body">
+                                <!-- JS populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leaflet JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    let map = L.map('admin-map').setView([13.02153, 74.96866], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let markers = {};
+
+    async function updateFleet() {
+        try {
+            const response = await fetch('/api/all-drivers-location');
+            const drivers = await response.json();
+            
+            const listBody = document.getElementById('driver-list-body');
+            let html = '';
+
+            drivers.forEach(driver => {
+                const { driver_id, name, lat, lng, status } = driver;
+                
+                // Update Marker
+                if (markers[driver_id]) {
+                    markers[driver_id].setLatLng([lat, lng]);
+                } else {
+                    const icon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div style="background-color: ${status === 'available' ? '#22c55e' : '#ef4444'}; border: 2px solid white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">🚑</div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+                    
+                    markers[driver_id] = L.marker([lat, lng], { icon: icon })
+                        .addTo(map)
+                        .bindPopup(`<b>${name}</b><br>Status: ${status}`);
+                }
+
+                // Update Table
+                const statusColor = status === 'available' ? 'success' : 'danger';
+                html += `
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="bg-light rounded-circle p-2 me-3">🚑</div>
+                                <div>
+                                    <div class="fw-bold">${name}</div>
+                                    <div class="text-muted small">ID: #${driver_id}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="badge bg-${statusColor} rounded-pill">${status}</span></td>
+                        <td><code class="small">${lat.toFixed(5)}, ${lng.toFixed(5)}</code></td>
+                        <td><small class="text-muted">${new Date().toLocaleTimeString()}</small></td>
+                    </tr>
+                `;
+            });
+
+            listBody.innerHTML = html;
+        } catch (error) {
+            console.error("Fleet update failed:", error);
+        }
+    }
+
+    // Initial load and interval
+    updateFleet();
+    setInterval(updateFleet, 5000);
+</script>
+
+<style>
+    .custom-div-icon { background: none; border: none; }
+</style>
+{% endblock %}

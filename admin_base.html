@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeLink Admin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="logo-container" style="padding: 15px; text-align: center;">
+            <img src="{{ url_for('static', filename='LifeLink Logo.png') }}" alt="LifeLink Logo" style="width: 100%; max-width: 140px; height: auto; mix-blend-mode: multiply;">
+        </div>
+        <nav>
+            <a href="/admin/dashboard">Dashboard</a>
+            <a href="/admin/users">Users</a>
+            <a href="/admin/drivers">Drivers</a>
+            <a href="/admin/ambulances">Ambulances</a>
+            <a href="/admin/hospitals">Hospitals</a>
+            <a href="/admin/bookings">Bookings</a>
+            <a href="/admin/live-tracking">Live Tracking</a>
+            <a href="/admin/notifications">Notifications</a>
+            <a href="/admin/bugs">Bug Tracker</a>
+            <a href="/admin/feedback">Feedback</a>
+            <a href="/logout" class="logout">Logout</a>
+        </nav>
+    </aside>
+
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>

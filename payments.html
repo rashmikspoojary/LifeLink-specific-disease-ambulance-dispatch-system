@@ -1,0 +1,40 @@
+{% extends "admin/admin_base.html" %}
+
+{% block content %}
+<h2>Payments</h2>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>User</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in payments %}
+        <tr>
+            <td>{{ p.id }}</td>
+            <td>{{ p.user_name }}</td>
+            <td>Rs. {{ p.amount }}</td>
+            <td>{{ p.status }}</td>
+            <td>{{ p.created_at }}</td>
+            <td>
+                <a href="/admin/payments/receipt/{{ p.id }}" class="btn btn-sm btn-primary" target="_blank">Receipt</a>
+
+                <form method="POST" action="/admin/payments/delete/{{ p.id }}" style="display:inline;" onsubmit="return confirm('Are you sure?');">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="6" style="text-align:center;">No payments recorded yet.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

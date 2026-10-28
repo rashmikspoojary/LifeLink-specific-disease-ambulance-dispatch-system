@@ -1,0 +1,159 @@
+{% extends "admin/admin_base.html" %}
+
+{% block content %}
+<h1>Drivers Management</h1>
+
+<div class="actions-row">
+    <form method="POST" action="/admin/drivers/clear" style="display:inline;background:transparent;padding:0;max-width:none;">
+        <button class="btn btn-danger" onclick="return confirm('Clear all drivers?')">Clear All Drivers</button>
+    </form>
+</div>
+
+<div class="card" style="margin-bottom:14px;">
+    <h3 style="margin-bottom:10px;">Add New Driver</h3>
+    <p style="margin-top:0;color:#64748b;">Drivers can login from the new driver portal. Leave password blank to use the default password <strong>driver123</strong>.</p>
+    <form method="POST" action="/admin/drivers/add">
+        <label>Driver Name</label>
+        <input type="text" name="name" required>
+
+        <label>Driver Email</label>
+        <input type="email" name="email" placeholder="driver@lifelink.com">
+
+        <label>Password</label>
+        <input type="text" name="password" placeholder="Leave blank to use default driver123">
+
+        <label>Phone</label>
+        <input type="text" name="phone" required>
+
+        <label>License Number</label>
+        <input type="text" name="license_no" required>
+
+        <label>Linked Ambulance</label>
+        <select name="ambulance_id">
+            <option value="">Select ambulance</option>
+            {% for ambulance in ambulances %}
+            <option value="{{ ambulance.id }}">{{ ambulance.vehicle_number }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Current Location</label>
+        <input type="text" name="current_location_text" placeholder="e.g. City Hospital Gate">
+
+        <label>Latitude</label>
+        <input type="text" name="current_latitude" placeholder="13.0215300">
+
+        <label>Longitude</label>
+        <input type="text" name="current_longitude" placeholder="74.9686600">
+
+        <button type="submit" class="btn btn-success">Add Driver</button>
+    </form>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>License</th>
+                <th>Linked Ambulance</th>
+                <th>Live Location</th>
+                <th>Lat</th>
+                <th>Lng</th>
+                <th>Status</th>
+                <th>Assignment</th>
+                <th>Save GPS</th>
+                <th>Live Link</th>
+                <th>Copy Link</th>
+                <th>Toggle</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for driver in drivers %}
+            <tr>
+                <td>{{ driver.id }}</td>
+                <td><input value="{{ driver.name }}" readonly></td>
+                <td><input value="{{ driver.email or '' }}" readonly></td>
+                <td><input value="{{ driver.phone }}" readonly></td>
+                <td><input value="{{ driver.license_no }}" readonly></td>
+                <td>
+                    <form method="POST" action="/admin/drivers/link/{{ driver.id }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <select name="ambulance_id">
+                            <option value="">No ambulance</option>
+                            {% for ambulance in ambulances %}
+                            <option value="{{ ambulance.id }}" {% if driver.ambulance_id == ambulance.id %}selected{% endif %}>{{ ambulance.vehicle_number }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-warning" type="submit">Save Link</button>
+                    </form>
+                    <div style="font-size:12px;color:#64748b;margin-top:4px;">{{ driver.ambulance_number or 'Not linked' }}</div>
+                </td>
+                <td><input form="gps-driver-{{ driver.id }}" name="current_location_text" value="{{ driver.current_location_text or '' }}" placeholder="Current location"></td>
+                <td><input form="gps-driver-{{ driver.id }}" name="current_latitude" value="{{ driver.current_latitude or '' }}" placeholder="Lat"></td>
+                <td><input form="gps-driver-{{ driver.id }}" name="current_longitude" value="{{ driver.current_longitude or '' }}" placeholder="Lng"></td>
+                <td><input value="{{ driver.status }}" readonly></td>
+                <td>
+                    {% if driver.has_active_booking %}
+                        <span style="color:#b45309;font-weight:700;">Assigned (Locked Busy)</span>
+                    {% else %}
+                        <span style="color:#166534;font-weight:700;">Free</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <form id="gps-driver-{{ driver.id }}" method="POST" action="/admin/drivers/location/{{ driver.id }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <button class="btn btn-warning" type="submit">Save GPS</button>
+                    </form>
+                </td>
+                <td>
+                    <a href="/driver/live/{{ driver.tracking_token }}" class="btn btn-primary" target="_blank">Open Live Share</a>
+                    {% if driver.last_location_update %}
+                    <div style="font-size:12px;color:#64748b;margin-top:4px;">Updated: {{ driver.last_location_update }}</div>
+                    {% endif %}
+                </td>
+                <td>
+                    <button
+                        class="btn btn-success"
+                        type="button"
+                        onclick="copyDriverLink('{{ request.url_root.rstrip('/') }}/driver/live/{{ driver.tracking_token }}', this)">
+                        Copy Live Link
+                    </button>
+                </td>
+                <td>
+                    {% if driver.has_active_booking %}
+                        <button class="btn btn-secondary" type="button" disabled>Assigned</button>
+                    {% elif driver.status == 'available' %}
+                        <a href="/admin/drivers/toggle/{{ driver.id }}" class="btn btn-primary">Mark Busy</a>
+                    {% else %}
+                        <a href="/admin/drivers/toggle/{{ driver.id }}" class="btn btn-success">Mark Available</a>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="POST" action="/admin/drivers/delete/{{ driver.id }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <button class="btn btn-danger" onclick="return confirm('Delete this driver?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="16" style="text-align:center;">No drivers found</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+function copyDriverLink(link, button) {
+    navigator.clipboard.writeText(link).then(function () {
+        const original = button.textContent;
+        button.textContent = "Copied";
+        setTimeout(function () {
+            button.textContent = original;
+        }, 1500);
+    }).catch(function () {
+        alert("Copy failed. Link: " + link);
+    });
+}
+</script>
+{% endblock %}

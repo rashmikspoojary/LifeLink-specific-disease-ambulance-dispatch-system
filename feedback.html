@@ -1,0 +1,38 @@
+{% extends "admin/admin_base.html" %}
+
+{% block title %}Feedback Management{% endblock %}
+
+{% block content %}
+<h2>Feedback</h2>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>User</th>
+            <th>Email</th>
+            <th>Rating</th>
+            <th>Message</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for f in feedbacks %}
+        <tr>
+            <td>{{ f.name }}</td>
+            <td>{{ f.email }}</td>
+            <td>
+                {% for i in range(f.rating) %}
+                    ⭐
+                {% endfor %}
+            </td>
+            <td>{{ f.message }}</td>
+            <td>{{ f.created_at }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="5" style="text-align:center;">No feedback available</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

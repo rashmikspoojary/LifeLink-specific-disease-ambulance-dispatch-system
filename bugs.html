@@ -1,0 +1,88 @@
+{% extends "admin/admin_base.html" %}
+
+{% block content %}
+<h1>Bug Tracker</h1>
+
+<div class="actions-row">
+    <form method="POST" action="{{ url_for('clear_bugs') }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+        <button class="btn btn-danger" onclick="return confirm('Clear all bug tickets?')">Clear All Bugs</button>
+    </form>
+</div>
+
+<div class="card" style="margin-bottom:14px;">
+    <h3>Add Bug Ticket</h3>
+    <form method="POST" action="{{ url_for('admin_bugs') }}">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;">
+            <input name="title" placeholder="Bug title" required>
+            <select name="priority">
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+            </select>
+            <input name="assigned_to" placeholder="Assign to (name)">
+        </div>
+        <textarea name="description" placeholder="Bug details..." style="margin-top:8px;min-height:90px;"></textarea>
+        <button class="btn btn-primary" type="submit" style="margin-top:8px;">Add Bug</button>
+    </form>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Assigned To</th>
+                <th>Created By</th>
+                <th>Created At</th>
+                <th>Edit</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for bug in bugs %}
+            <tr>
+                <td>{{ bug.id }}</td>
+                <td><input form="edit-bug-{{ bug.id }}" name="title" value="{{ bug.title }}" required></td>
+                <td><textarea form="edit-bug-{{ bug.id }}" name="description" style="min-height:54px;">{{ bug.description or '' }}</textarea></td>
+                <td>
+                    <select form="edit-bug-{{ bug.id }}" name="priority">
+                        <option value="low" {% if bug.priority == 'low' %}selected{% endif %}>low</option>
+                        <option value="medium" {% if bug.priority == 'medium' %}selected{% endif %}>medium</option>
+                        <option value="high" {% if bug.priority == 'high' %}selected{% endif %}>high</option>
+                        <option value="critical" {% if bug.priority == 'critical' %}selected{% endif %}>critical</option>
+                    </select>
+                </td>
+                <td>
+                    <select form="edit-bug-{{ bug.id }}" name="status">
+                        <option value="open" {% if bug.status == 'open' %}selected{% endif %}>open</option>
+                        <option value="in-progress" {% if bug.status == 'in-progress' %}selected{% endif %}>in-progress</option>
+                        <option value="resolved" {% if bug.status == 'resolved' %}selected{% endif %}>resolved</option>
+                        <option value="closed" {% if bug.status == 'closed' %}selected{% endif %}>closed</option>
+                    </select>
+                </td>
+                <td><input form="edit-bug-{{ bug.id }}" name="assigned_to" value="{{ bug.assigned_to or '' }}"></td>
+                <td>{{ bug.created_by }}</td>
+                <td>{{ bug.created_at }}</td>
+                <td>
+                    <form id="edit-bug-{{ bug.id }}" method="POST" action="{{ url_for('update_bug', bug_id=bug.id) }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <button class="btn btn-warning" type="submit">Edit</button>
+                    </form>
+                </td>
+                <td>
+                    <form method="POST" action="{{ url_for('delete_bug', bug_id=bug.id) }}" style="display:inline;background:transparent;padding:0;max-width:none;">
+                        <button class="btn btn-danger" onclick="return confirm('Delete this bug?')">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="10" style="text-align:center;">No bug tickets yet</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

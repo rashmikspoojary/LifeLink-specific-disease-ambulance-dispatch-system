@@ -1,0 +1,106 @@
+{% extends "admin/admin_base.html" %}
+
+{% block content %}
+<h2>Bookings</h2>
+
+<div class="actions-row">
+    <form method="POST" action="/admin/bookings/clear-completed" style="display:inline;background:transparent;padding:0;max-width:none;">
+        <button class="btn btn-danger" onclick="return confirm('Clear all completed bookings?')">Clear Completed</button>
+    </form>
+</div>
+
+<div class="table-container">
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>User</th>
+            <th>Email</th>
+            <th>Hospital</th>
+            <th>Pickup</th>
+            <th>Disease</th>
+            <th>Emergency</th>
+            <th>Medical</th>
+            <th>Ambulance</th>
+            <th>Driver</th>
+            <th>Status</th>
+            <th>ETA</th>
+            <th>Assign</th>
+            <th>Edit</th>
+            <th>Progress</th>
+            <th>Delete</th>
+        </tr>
+    </thead>
+    <tbody>
+{% for booking in bookings %}
+<tr>
+    <td>{{ booking.booking_id }}</td>
+    <td>{{ booking.user_name }}</td>
+    <td>{{ booking.email }}</td>
+    <td>{{ booking.hospital_name or 'Not Selected' }}</td>
+    <td>{{ booking.pickup_location or 'Not provided' }}</td>
+    <td>{{ booking.disease_type or 'General Emergency' }}</td>
+    <td>{{ booking.emergency_level or '-' }}</td>
+    <td>{{ booking.medical_notes or '-' }}</td>
+    <td>{{ booking.ambulance_number or 'Not Assigned' }}</td>
+    <td>{{ booking.driver_name or 'Not Assigned' }}</td>
+    <td>{{ booking.status }}</td>
+    <td>{% if booking.estimated_arrival_minutes %}{{ booking.estimated_arrival_minutes }} min{% else %}-{% endif %}</td>
+
+    <td>
+        {% if booking.status == 'requested' %}
+        <form method="POST" action="/admin/bookings/assign/{{ booking.booking_id }}" style="background:transparent;padding:0;max-width:none;">
+            <select name="ambulance_id" required>
+                <option value="">Ambulance</option>
+                {% for a in assign_ambulances %}
+                    <option value="{{ a.id }}">{{ a.vehicle_number }} ({{ a.status }})</option>
+                {% endfor %}
+            </select>
+            <select name="driver_id" required>
+                <option value="">Driver</option>
+                {% for d in assign_drivers %}
+                    <option value="{{ d.id }}">{{ d.name }} ({{ d.status }})</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-primary" type="submit">Assign</button>
+        </form>
+        {% else %}
+            -
+        {% endif %}
+    </td>
+
+    <td>
+        <form method="POST" action="/admin/bookings/edit/{{ booking.booking_id }}" style="background:transparent;padding:0;max-width:none;">
+            <select name="status" required>
+                <option value="requested" {% if booking.status == 'requested' %}selected{% endif %}>requested</option>
+                <option value="pending" {% if booking.status == 'pending' %}selected{% endif %}>pending</option>
+                <option value="accepted" {% if booking.status == 'accepted' %}selected{% endif %}>accepted</option>
+                <option value="on-the-way" {% if booking.status == 'on-the-way' %}selected{% endif %}>on-the-way</option>
+                <option value="reached" {% if booking.status == 'reached' %}selected{% endif %}>reached</option>
+                <option value="completed" {% if booking.status == 'completed' %}selected{% endif %}>completed</option>
+            </select>
+            <button class="btn btn-warning" type="submit">Save</button>
+        </form>
+    </td>
+
+    <td>
+        {% if booking.status != 'completed' %}
+            <a class="btn btn-success" href="/admin/bookings/update/{{ booking.booking_id }}">Next Status</a>
+        {% else %}
+            Completed
+        {% endif %}
+    </td>
+
+    <td>
+        <a class="btn btn-danger" href="/admin/bookings/delete/{{ booking.booking_id }}" onclick="return confirm('Delete this booking?')">Delete</a>
+    </td>
+</tr>
+{% else %}
+<tr>
+            <td colspan="16" style="text-align:center;">No bookings found</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endblock %}

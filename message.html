@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title if title else "LifeLink Message" }}</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background: linear-gradient(135deg, #E3F2FD, #1565C0);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .message-box {
+            background: #ffffff;
+            width: 420px;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+
+        .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .success {
+            color: #43A047;
+        }
+
+        .error {
+            color: #D32F2F;
+        }
+
+        .warning {
+            color: #FB8C00;
+        }
+
+        h2 {
+            margin: 10px 0;
+            color: #1565C0;
+        }
+
+        p {
+            color: #424242;
+            font-size: 15px;
+            margin-bottom: 25px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 10px 18px;
+            background-color: #1565C0;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: #0D47A1;
+        }
+
+        .btn-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn.secondary {
+            background-color: #455A64;
+        }
+
+        .btn.secondary:hover {
+            background-color: #263238;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="message-box">
+
+    {% if type == "success" %}
+        <div class="icon success">✔</div>
+    {% elif type == "error" %}
+        <div class="icon error">✖</div>
+    {% elif type == "warning" %}
+        <div class="icon warning">⚠</div>
+    {% else %}
+        <div class="icon">ℹ</div>
+    {% endif %}
+
+    <h2>{{ heading if heading else "Message" }}</h2>
+
+    <p>{{ message }}</p>
+    <a href="/login" class="btn-login">Go to Login</a>
+
+    <div class="btn-row">
+        {% if redirect_url %}
+            <a href="{{ redirect_url }}" class="btn">
+                {{ button_text if button_text else "Continue" }}
+            </a>
+        {% endif %}
+
+        {% if session.get("user_id") %}
+            <a href="/home" class="btn secondary">Back to Home</a>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>

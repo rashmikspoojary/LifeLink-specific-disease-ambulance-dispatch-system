@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Live Location</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(160deg, #e7f0ff 0%, #f8fbff 100%);
+            color: #10233d;
+            padding: 18px;
+        }
+        .card {
+            max-width: 760px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 16px 42px rgba(15, 35, 61, 0.12);
+            padding: 20px;
+        }
+        h1 {
+            margin-top: 0;
+            color: #1149b9;
+        }
+        .status {
+            display: inline-block;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-weight: 700;
+            background: #dbeafe;
+            color: #1d4ed8;
+            margin-bottom: 12px;
+        }
+        .meta {
+            margin-bottom: 8px;
+            color: #334155;
+        }
+        .note {
+            margin-top: 16px;
+            padding: 14px;
+            border-radius: 12px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+        }
+        .ok { color: #15803d; font-weight: 700; }
+        .bad { color: #b91c1c; font-weight: 700; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        .home-btn {
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 12px;
+            background: #fff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .home-btn:hover {
+            background: #f0f7ff;
+            border-color: #3b82f6;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <img src="{{ url_for('static', filename='LifeLink Logo.png') }}" alt="LifeLink Logo" style="height: 45px; width: auto; mix-blend-mode: multiply;">
+            <h1 style="margin: 0; font-size: 1.5rem;">GPS Sharing</h1>
+        </div>
+        <a href="{{ url_for('driver_dashboard') }}" class="home-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Home
+        </a>
+    </div>
+    <div class="status">Driver: {{ driver.name }}</div>
+    <div class="meta"><strong>Phone:</strong> {{ driver.phone }}</div>
+    <div class="meta"><strong>License:</strong> {{ driver.license_no }}</div>
+    <div class="meta"><strong>Current Status:</strong> {{ driver.status }}</div>
+    {% if active_booking %}
+    <div class="meta"><strong>Active Booking:</strong> #{{ active_booking.id }}</div>
+    <div class="meta"><strong>User:</strong> {{ active_booking.user_name }}</div>
+    <div class="meta"><strong>Pickup:</strong> {{ active_booking.pickup_location or 'Not provided' }}</div>
+    <div class="meta"><strong>Dispatch Status:</strong> {{ active_booking.status }}</div>
+    {% else %}
+    <div class="meta"><strong>Active Booking:</strong> No active booking right now</div>
+    {% endif %}
+
+    <div class="note">
+        Keep this page open on the driver's phone and allow location access. The location will update automatically every few seconds for admin and user tracking.
+    </div>
+    <div class="note">
+        <div id="gps-status" class="bad">Waiting for GPS permission...</div>
+        <div class="meta" id="gps-place" style="font-weight: 600; color: #1e40af; margin-top: 5px;">Detecting place name...</div>
+        <div class="meta" id="gps-coords">Coordinates: waiting...</div>
+        <div class="meta" id="gps-time">Last sent: not yet</div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script>
+const bookingId = parseInt("{{ active_booking.id if active_booking else 0 }}");
+const driverId = parseInt("{{ driver.id | default(0) }}");
+const trackingToken = "{{ tracking_token }}";
+const statusEl = document.getElementById("gps-status");
+const coordsEl = document.getElementById("gps-coords");
+const timeEl = document.getElementById("gps-time");
+let lastSentAt = 0;
+
+const socket = io();
+
+async function sendPosition(position) {
+    const now = Date.now();
+    if (now - lastSentAt < 5000) return; // Send every 5 seconds
+    lastSentAt = now;
+
+    const latitude = Number(position.coords.latitude).toFixed(7);
+    const longitude = Number(position.coords.longitude).toFixed(7);
+    coordsEl.textContent = `Coordinates: ${latitude}, ${longitude}`;
+
+    // Fetch human-readable place name (Reverse Geocoding)
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
+        .then(res => res.json())
+        .then(data => {
+            const placeEl = document.getElementById("gps-place");
+            if (placeEl) placeEl.textContent = data.display_name || "Location found";
+        })
+        .catch(() => {
+            const placeEl = document.getElementById("gps-place");
+            if (placeEl) placeEl.textContent = "Location name unavailable";
+        });
+
+    // 1. Emit via SocketIO for REAL-TIME tracking
+    if (bookingId > 0) {
+        socket.emit('update_location', {
+            booking_id: bookingId,
+            driver_id: driverId,
+            lat: latitude,
+            lng: longitude
+        });
+    }
+
+    // 2. Also send via POST for persistence (optional but good for backup)
+    try {
+        const response = await fetch(`/api/driver-location/${trackingToken}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                latitude: latitude,
+                longitude: longitude,
+                location_text: "Driver GPS Live"
+            })
+        });
+        const payload = await response.json();
+        if (response.ok && payload.ok) {
+            statusEl.textContent = "Live GPS sharing is active (Socket + API)";
+            statusEl.className = "ok";
+            timeEl.textContent = `Last sent: ${new Date().toLocaleTimeString()}`;
+        }
+    } catch (error) {
+        console.error("API update failed, but Socket might still be working", error);
+    }
+}
+
+if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(
+        sendPosition,
+        function () {
+            statusEl.textContent = "Location permission denied or GPS unavailable";
+            statusEl.className = "bad";
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 2000,
+            timeout: 15000
+        }
+    );
+} else {
+    statusEl.textContent = "This device does not support browser geolocation";
+    statusEl.className = "bad";
+}
+</script>
+</body>
+</html>

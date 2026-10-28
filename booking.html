@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>LifeLink | Book Ambulance</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+
+    <style>
+        .booking-card {
+            max-width: 500px;
+            margin: 60px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .booking-card h2 {
+            color: #0d6efd;
+            margin-bottom: 15px;
+        }
+
+        .booking-card p {
+            color: #555;
+            margin-bottom: 25px;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+
+        .button-row a,
+        .button-row button {
+            min-width: 130px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="booking-card">
+        <h2>Confirm Ambulance Booking</h2>
+
+        <p>
+            Confirm your pickup details below. LifeLink will assign the nearest available ambulance using saved location
+            data when possible.
+        </p>
+
+        <form method="POST">
+            <!-- 1. Location Input -->
+           <input type="text" id="location" name="pickup_location" placeholder="Enter your location">
+            <br><br>
+            <button type="button" id="useLocation">📍 Use Current Location</button>
+            <input type="hidden" name="pickup_latitude" id="lat">
+            <input type="hidden" name="pickup_longitude" id="lng">
+
+            <!-- Disease selection -->
+            <label>Disease / Problem</label>
+            <select id="disease_type" name="disease_type"
+                style="width:100%;padding:10px;border:1px solid #d0d7e2;border-radius:8px;margin-bottom:12px;">
+                <option value="Asthma">Asthma</option>
+                <option value="Cardiac">Cardiac</option>
+                <option value="Maternity">Maternity</option>
+                <option value="Accident">Accident</option>
+                <option value="Stroke">Stroke</option>
+                <option value="Basic" selected>Basic</option>
+                <option value="Other">Other</option>
+            </select>
+            <input id="disease_other" type="text" placeholder="Describe other problem"
+                style="display:none;width:100%;padding:10px;border:1px solid #d0d7e2;border-radius:8px;margin-bottom:12px;" />
+            <select name="emergency_level"
+                style="width:100%;padding:10px;border:1px solid #d0d7e2;border-radius:8px;margin-bottom:12px;">
+                <option value="low">Low Emergency</option>
+                <option value="medium" selected>Medium Emergency</option>
+                <option value="high">High Emergency</option>
+                <option value="critical">Critical Emergency</option>
+            </select>
+
+            <div id="ambulance_hint" style="margin:-2px 0 12px;text-align:left;color:#0d6efd;font-weight:600;">
+                Suggested ambulance type: {{ recommended_ambulance_type or 'Basic' }}
+            </div>
+
+            <textarea name="medical_notes" placeholder="Medical notes (optional)"
+                style="width:100%;padding:10px;border:1px solid #d0d7e2;border-radius:8px;margin-bottom:12px;min-height:90px;">{{ user_profile.medical_info or '' }}</textarea>
+
+            <div class="button-row">
+                <a href="/symptoms" class="btn btn-secondary">Back</a>
+                <button type="submit" class="btn btn-primary">Request Ambulance Now</button>
+            </div>
+        </form>
+    </div>
+
+    <script src="{{ url_for('static', filename='user_notifications.js') }}"></script>
+    <script>
+    
+
+        // Geolocation Logic
+        document.getElementById('useLocation').addEventListener('click', function() {
+            if (navigator.geolocation) {
+                const btn = this;
+                btn.innerText = "📍 Detecting...";
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        document.getElementById('lat').value = lat;
+                        document.getElementById('lng').value = lng;
+                        
+                        // Fetch human-readable address (Reverse Geocoding)
+                        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                document.getElementById('location').value = data.display_name || `GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                            })
+                            .catch(err => {
+                                console.error("Geocoding Error:", err);
+                                document.getElementById('location').value = `GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                            });
+
+                        btn.innerText = "✅ Location Captured";
+                        btn.style.background = "#dcfce7";
+                        btn.style.color = "#166534";
+                    },
+                    (error) => {
+                        let msg = "Could not get location.";
+                        if (error.code === 1) msg = "Please allow location access in your browser.";
+                        alert(msg);
+                        btn.innerText = "📍 Use Current Location";
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            } else {
+                alert("Geolocation is not supported by your browser.");
+            }
+        });
+
+        // Disease logic (Pre-existing)
+        const diseaseInput = document.getElementById("disease_type");
+        const diseaseOtherInput = document.getElementById("disease_other");
+        const ambulanceHint = document.getElementById("ambulance_hint");
+
+        function recommendAmbulanceType(text) {
+            const value = (text || "").toLowerCase();
+            if (/(breath|asthma|oxygen|respiratory|lungs|ventilator)/.test(value)) return "Ventilator";
+            if (/(heart|cardiac|stroke|brain|icu|critical|seizure|unconscious)/.test(value)) return "ICU";
+            if (/(accident|trauma|fracture|injury|bleeding|burn)/.test(value)) return "ICU";
+            return "Basic";
+        }
+
+        if (diseaseInput && ambulanceHint) {
+            diseaseInput.addEventListener("change", function () {
+                const selected = diseaseInput.value;
+                const showCustom = selected === "Other";
+
+                diseaseOtherInput.style.display = showCustom ? "block" : "none";
+
+                if (!showCustom) {
+                    diseaseOtherInput.value = "";
+                    ambulanceHint.textContent = "🚑 Suggested ambulance: " + recommendAmbulanceType(selected);
+                } else {
+                    ambulanceHint.textContent = "🚑 Suggested ambulance: Basic";
+                }
+            });
+
+            diseaseOtherInput.addEventListener("input", function () {
+                ambulanceHint.textContent = "🚑 Suggested ambulance: " + recommendAmbulanceType(diseaseOtherInput.value);
+            });
+
+            diseaseInput.dispatchEvent(new Event("change"));
+
+            const form = document.querySelector("form");
+
+            form.addEventListener("submit", function () {
+                if (diseaseInput.value === "Other") {
+                    diseaseInput.value = diseaseOtherInput.value.trim() || "Other";
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>
