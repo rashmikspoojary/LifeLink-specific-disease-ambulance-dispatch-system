@@ -83,13 +83,12 @@ The repository contains the source code, templates, static assets, and supportin
 
                               Or
     
-1.Find The Zip File(Lifelink.zip).Download it to file explorer.
-2.Extract The File 
-3.Find "run_lifelink.bat"
-4.Double Click on the File
-5.Wait for while and it opens the web app
-6.Now you can explore the app
-
+1. Find The Zip File(Lifelink.zip).Download it to file explorer.
+2. Extract The File 
+3. Find "run_lifelink.bat"
+4. Double Click on the File
+5. Wait for while and it opens the web app
+6. Now you can explore the app
 Refer to the source code and configuration files for project-specific setup requirements.
 
 ## Project Purpose
