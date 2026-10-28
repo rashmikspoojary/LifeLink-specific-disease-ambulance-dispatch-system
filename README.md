@@ -80,7 +80,9 @@ The repository contains the source code, templates, static assets, and supportin
 7. Create and initialize the required database tables.
 8. Run the Flask application using app.py(entry point of the project).
 9. Open the local address displayed in your terminal in a web browser.
+
                               Or
+    
 1.Find The Zip File(Lifelink.zip).Download it to file explorer.
 2.Extract The File 
 3.Find "run_lifelink.bat"
